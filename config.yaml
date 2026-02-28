@@ -1,0 +1,80 @@
+# ~/.cognilayer/config.yaml
+# CogniLayer v2.9 — Phase 1 (FTS5 only)
+
+# General
+version: "2.9"
+language: "cs"
+
+# Paths (auto-detected)
+paths:
+  home: "~/.cognilayer"
+  db: "~/.cognilayer/memory.db"
+  log: "~/.cognilayer/logs/cognilayer.log"
+
+# File Indexer
+indexer:
+  scan_depth: 3
+  chunk_max_chars: 2000
+  chunk_overlap_chars: 200
+  doc_extensions:
+    - ".md"
+    - ".txt"
+    - ".json"
+    - ".yaml"
+    - ".yml"
+    - ".toml"
+  code_extensions:
+    - ".ts"
+    - ".tsx"
+    - ".js"
+    - ".jsx"
+    - ".py"
+    - ".php"
+    - ".css"
+    - ".html"
+  doc_max_file_size: 200000
+  code_max_file_size: 50000
+  ignore_dirs:
+    - "node_modules"
+    - ".git"
+    - "__pycache__"
+    - ".next"
+    - "dist"
+    - "build"
+    - "venv"
+    - ".venv"
+  ignore_files:
+    - "package-lock.json"
+    - "yarn.lock"
+    - "pnpm-lock.yaml"
+
+# Search (Phase 1: FTS5 only)
+search:
+  default_limit: 5
+  max_limit: 10
+
+# Project DNA
+dna:
+  max_tokens: 150
+  template: |
+    ## Project DNA: {name}
+    Stack: {stack}
+    Style: {style}
+    Structure: {structure}
+    Deploy: {deploy}
+    Active: {active}
+    Patterns: {patterns}
+    Last: {last}
+
+# Session
+session:
+  bridge_max_tokens: 150
+
+# Projects — set to your projects directory
+projects:
+  base_path: "~/projects"
+
+# Logging
+logging:
+  level: "INFO"
+  max_size_mb: 10

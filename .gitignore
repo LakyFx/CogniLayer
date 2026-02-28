@@ -1,0 +1,45 @@
+# CogniLayer runtime data
+memory.db
+memory.db-wal
+memory.db-shm
+active_session.json
+mcp-stderr.log
+
+# Logs
+logs/
+*.log
+
+# Cache
+cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code
+CLAUDE.md
+
+# PRD (internal docs, not for public)
+cognilayer-prd*.md

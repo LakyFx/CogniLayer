@@ -1,0 +1,32 @@
+[project]
+name = "cognilayer"
+version = "2.9.0"
+description = "Persistent memory for Claude Code — MCP server + hooks that give Claude long-term memory across sessions"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+requires-python = ">=3.10"
+authors = []
+keywords = ["claude", "claude-code", "mcp", "memory", "ai", "llm", "persistent-memory"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+[project.urls]
+Homepage = "https://github.com/YOUR_USERNAME/CogniLayer"
+Repository = "https://github.com/YOUR_USERNAME/CogniLayer"
+Issues = "https://github.com/YOUR_USERNAME/CogniLayer/issues"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[tool.setuptools]
+packages = ["mcp-server", "hooks", "commands"]
