@@ -6,6 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from db import open_db
+from i18n import t
 
 
 def recommend_tech(description: str = None, similar_to: str = None,
@@ -27,15 +28,15 @@ def recommend_tech(description: str = None, similar_to: str = None,
 
             if row:
                 stack = dict(row)
-                lines = [f"## Tech doporuceni\n\nNa zaklade projektu: {similar_to}\n"]
-                lines.append("Doporuceny stack:")
+                lines = [t("recommend_tech.header") + "\n" + t("recommend_tech.based_on_project", project=similar_to)]
+                lines.append(t("recommend_tech.recommended_stack"))
                 for k, v in stack.items():
                     if v:
                         lines.append(f"- {k}: {v}")
-                lines.append(f"\nPro aplikovani: /identity tech-from {similar_to}")
+                lines.append("\n" + t("recommend_tech.apply_hint", project=similar_to))
                 return "\n".join(lines)
             else:
-                return f"Projekt '{similar_to}' nema Identity Card."
+                return t("recommend_tech.no_identity", project=similar_to)
 
         # Search by category
         if category:
@@ -54,21 +55,21 @@ def recommend_tech(description: str = None, similar_to: str = None,
             """).fetchall()
 
         if not rows:
-            return "Zadne projekty s Identity Card v databazi. Pouzij /onboard pro registraci projektu."
+            return t("recommend_tech.no_projects")
 
-        lines = ["## Tech doporuceni\n"]
+        lines = [t("recommend_tech.header")]
         if description:
-            lines.append(f"Na zaklade popisu: {description}\n")
+            lines.append(t("recommend_tech.based_on_desc", description=description))
 
-        lines.append("Podobne projekty v portfoliu:")
+        lines.append(t("recommend_tech.similar_projects"))
         for row in rows:
             r = dict(row)
             tech_parts = [v for v in [r.get("framework"), r.get("language"),
                                        r.get("css_approach"), r.get("db_technology")] if v]
             lines.append(f"- {r['project']}: {', '.join(tech_parts) or '?'} ({r.get('project_category', '?')})")
 
-        lines.append(f"\nPro aplikovani stacku: /identity tech-from <nazev-projektu>")
-        lines.append(f"Pro upravu: /identity set framework=... css_approach=...")
+        lines.append("\n" + t("recommend_tech.apply_stack_hint"))
+        lines.append(t("recommend_tech.edit_hint"))
 
         return "\n".join(lines)
     finally:

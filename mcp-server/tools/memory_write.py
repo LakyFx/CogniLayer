@@ -9,6 +9,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from db import open_db, ensure_vec
 from utils import get_active_session
+from i18n import t
 
 
 def _embed_fact(db, rowid: int, content: str, tags: str = None, domain: str = None):
@@ -51,7 +52,7 @@ def memory_write(content: str, type: str = "fact", tags: str = None,
 
             if existing:
                 if existing[1] == content:
-                    return f"Fakt uz existuje (beze zmeny): {content[:60]}..."
+                    return t("memory_write.exists_unchanged", preview=content[:60])
                 # Update existing
                 db.execute("""
                     UPDATE facts SET content = ?, tags = ?, domain = ?,
@@ -67,7 +68,7 @@ def memory_write(content: str, type: str = "fact", tags: str = None,
                 # Update embedding
                 _embed_fact(db, existing[2], content, tags, domain)
                 db.commit()
-                return f"Aktualizovano v pameti: {content[:60]}... [projekt: {project}, typ: {type}]"
+                return t("memory_write.updated", preview=content[:60], project=project, type=type)
 
         # Insert new fact
         fact_id = str(uuid.uuid4())
@@ -92,7 +93,7 @@ def memory_write(content: str, type: str = "fact", tags: str = None,
     finally:
         db.close()
 
-    return f"Ulozeno do pameti: {content[:60]}... [projekt: {project}, typ: {type}]"
+    return t("memory_write.saved", preview=content[:60], project=project, type=type)
 
 
 def _get_mtime(project_path: str, source_file: str) -> float | None:

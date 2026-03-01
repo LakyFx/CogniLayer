@@ -7,6 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from db import open_db
 from utils import get_active_session
+from i18n import t
 
 
 # Required fields per action type
@@ -48,11 +49,12 @@ def verify_identity(action_type: str) -> str:
     project = session.get("project", "")
 
     if not project:
-        return "BLOCKED — Zadny aktivni projekt."
+        return t("verify_identity.blocked_no_project")
 
     required = REQUIRED_FIELDS.get(action_type, [])
     if not required:
-        return f"BLOCKED — Neznamy action_type: {action_type}. Povolene: {', '.join(REQUIRED_FIELDS.keys())}"
+        return t("verify_identity.blocked_unknown_action",
+                 action_type=action_type, allowed=', '.join(REQUIRED_FIELDS.keys()))
 
     db = open_db()
     try:
@@ -63,13 +65,10 @@ def verify_identity(action_type: str) -> str:
         db.close()
 
     if not row:
-        missing = ", ".join(f"- {f}: [NENASTAVENO]" for f in required)
-        return (
-            f"BLOCKED — Projekt '{project}' nema Identity Card.\n"
-            f"Chybi safety pole pro '{action_type}':\n{missing}\n\n"
-            f"ZEPTEJ SE uzivatele na tyto hodnoty.\n"
-            f"Pouzij /identity set pro konfiguraci."
-        )
+        not_set = t("verify_identity.not_set")
+        missing = ", ".join(f"- {f}: {not_set}" for f in required)
+        return t("verify_identity.blocked_no_identity",
+                 project=project, action_type=action_type, missing=missing)
 
     identity = dict(row)
 
@@ -80,45 +79,36 @@ def verify_identity(action_type: str) -> str:
             missing.append(field)
 
     if missing:
-        missing_str = "\n".join(f"- {f}: [NENASTAVENO]" for f in missing)
-        return (
-            f"BLOCKED — Chybi safety pole pro '{action_type}':\n{missing_str}\n\n"
-            f"ZEPTEJ SE uzivatele na tyto hodnoty.\n"
-            f"Pouzij /identity set pro konfiguraci."
-        )
+        not_set = t("verify_identity.not_set")
+        missing_str = "\n".join(f"- {f}: {not_set}" for f in missing)
+        return t("verify_identity.blocked_missing_fields",
+                 action_type=action_type, missing=missing_str)
 
     # Check if locked
     if not identity.get("safety_locked_at"):
+        not_set = t("verify_identity.not_set")
         fields_str = "\n".join(
-            f"- {f}: {identity.get(f, '[NENASTAVENO]')}" for f in required
+            f"- {f}: {identity.get(f, not_set)}" for f in required
         )
-        return (
-            f"WARNING — Identity pole existuji ale NEJSOU ZAMKNUTE.\n\n"
-            f"Aktualni hodnoty:\n{fields_str}\n\n"
-            f"Prezentuj hodnoty uzivateli a pozadej explicitni potvrzeni.\n"
-            f"Pro zamknuti: /identity lock"
-        )
+        return t("verify_identity.warning_unlocked", fields=fields_str)
 
     # Verify hash integrity
     stored_hash = identity.get("safety_lock_hash", "")
     computed_hash = _compute_safety_hash(identity)
     if stored_hash and stored_hash != computed_hash:
-        return (
-            f"BLOCKED — Safety pole byla zmenena mimo /identity update!\n"
-            f"Hash nesedi: expected {stored_hash}, got {computed_hash}\n"
-            f"Pouzij /identity lock pro re-zamknuti."
-        )
+        return t("verify_identity.blocked_tampered",
+                 expected=stored_hash, actual=computed_hash)
 
     # VERIFIED
-    return (
-        f"VERIFIED — Project: {project}\n"
-        f"Server: {identity.get('deploy_ssh_alias', '?')} ({identity.get('deploy_ssh_host', '?')})\n"
-        f"App Port: {identity.get('deploy_app_port', '?')}\n"
-        f"Deploy Path: {identity.get('deploy_path', '?')}\n"
-        f"PM2: {identity.get('pm2_process_name', '?')} (id={identity.get('pm2_process_id', '?')})\n"
-        f"Domain: {identity.get('domain_primary', '?')}\n"
-        f"Method: {identity.get('deploy_method', '?')}\n"
-        f"Git Branch: {identity.get('git_production_branch', '?')}\n\n"
-        f"POTVRD s uzivatelem: 'Budu {action_type} na {identity.get('deploy_ssh_alias', '?')} "
-        f"pro {identity.get('domain_primary', '?')}.'"
-    )
+    return t("verify_identity.verified",
+             project=project,
+             ssh_alias=identity.get('deploy_ssh_alias', '?'),
+             ssh_host=identity.get('deploy_ssh_host', '?'),
+             app_port=identity.get('deploy_app_port', '?'),
+             deploy_path=identity.get('deploy_path', '?'),
+             pm2_name=identity.get('pm2_process_name', '?'),
+             pm2_id=identity.get('pm2_process_id', '?'),
+             domain=identity.get('domain_primary', '?'),
+             method=identity.get('deploy_method', '?'),
+             branch=identity.get('git_production_branch', '?'),
+             action_type=action_type)

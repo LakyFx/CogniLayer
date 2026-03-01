@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from db import open_db
 from utils import get_active_session
+from i18n import t
 
 SAFETY_FIELDS = {
     "deploy_ssh_alias", "deploy_ssh_host", "deploy_ssh_port", "deploy_ssh_user",
@@ -45,12 +46,13 @@ def identity_set(fields: dict, lock_safety: bool = False) -> str:
     session_id = session.get("session_id", "")
 
     if not project:
-        return "Zadny aktivni projekt."
+        return t("identity_set.no_project")
 
     # Validate field names
     invalid = [k for k in fields if k not in ALL_FIELDS]
     if invalid:
-        return f"Neznama pole: {', '.join(invalid)}. Povolena: {', '.join(sorted(ALL_FIELDS))}"
+        return t("identity_set.unknown_fields",
+                 invalid=', '.join(invalid), allowed=', '.join(sorted(ALL_FIELDS)))
 
     now = datetime.now().isoformat()
 
@@ -66,11 +68,8 @@ def identity_set(fields: dict, lock_safety: bool = False) -> str:
             if existing_dict.get("safety_locked_at") and not lock_safety:
                 safety_changes = [k for k in fields if k in SAFETY_FIELDS]
                 if safety_changes:
-                    return (
-                        f"BLOCKED — Safety pole jsou zamknuta.\n"
-                        f"Pokus o zmenu: {', '.join(safety_changes)}\n"
-                        f"Pouzij /identity update pro zmenu zamknutych poli."
-                    )
+                    return t("identity_set.blocked_locked",
+                             changes=', '.join(safety_changes))
 
             # Update existing
             set_parts = []
@@ -141,11 +140,11 @@ def identity_set(fields: dict, lock_safety: bool = False) -> str:
         db.close()
 
     # Format response
-    lines = [f"Identity Card aktualizovana pro {project}:"]
+    lines = [t("identity_set.updated", project=project)]
     for k, v in fields.items():
         category = "[safety]" if k in SAFETY_FIELDS else "[tech]"
         lines.append(f"  {category} {k}: {v}")
-    lock_status = "zamknuto" if lock_safety else "odemknuto"
-    lines.append(f"Safety pole: {lock_status}")
+    lock_status = t("identity_set.safety_locked") if lock_safety else t("identity_set.safety_unlocked")
+    lines.append(t("identity_set.safety_status", status=lock_status))
 
     return "\n".join(lines)

@@ -7,6 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from db import open_db
 from utils import get_active_session
+from i18n import t
 
 
 def session_bridge(action: str, content: str = None) -> str:
@@ -28,13 +29,13 @@ def session_bridge(action: str, content: str = None) -> str:
 
         if row and row[0]:
             return f"## Session Bridge\n{row[0]}"
-        return "Zadny session bridge k dispozici."
+        return t("session_bridge.no_bridge")
 
     elif action == "save":
         if not content:
-            return "Chybi obsah bridge ke ulozeni."
+            return t("session_bridge.missing_content")
         if not session_id:
-            return "Zadna aktivni session."
+            return t("session_bridge.no_session")
 
         db = open_db()
         try:
@@ -45,6 +46,6 @@ def session_bridge(action: str, content: str = None) -> str:
         finally:
             db.close()
 
-        return "Session bridge ulozen."
+        return t("session_bridge.saved")
 
-    return f"Neznama akce: {action}. Pouzij 'load' nebo 'save'."
+    return t("session_bridge.unknown_action", action=action)

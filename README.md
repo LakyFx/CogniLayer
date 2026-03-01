@@ -125,7 +125,7 @@ mkdir -p ~/.cognilayer/mcp-server ~/.cognilayer/hooks ~/.cognilayer/logs
 cp -r mcp-server/* ~/.cognilayer/mcp-server/
 cp -r hooks/* ~/.cognilayer/hooks/
 cp config.yaml ~/.cognilayer/
-cp -r commands/* ~/.claude/commands/
+cp -r commands/en/* ~/.claude/commands/  # or commands/cs/ for Czech
 
 # Initialize database
 cd ~/.cognilayer/mcp-server && python init_db.py
@@ -230,6 +230,9 @@ cd ~/projects/my-app && claude
 Edit `~/.cognilayer/config.yaml`:
 
 ```yaml
+# Language — "en" (default) or "cs" (Czech)
+language: "en"
+
 # Set your projects directory
 projects:
   base_path: "~/projects"
@@ -244,6 +247,16 @@ search:
   default_limit: 5
   max_limit: 10
 ```
+
+### Language Support
+
+CogniLayer supports English (`en`) and Czech (`cs`). Set the `language` field in `config.yaml` to switch. This affects:
+- MCP tool descriptions and parameter hints
+- All tool output messages (errors, confirmations, warnings)
+- CLAUDE.md auto-generated instructions
+- Slash command prompts (`/status`, `/recall`, etc.)
+
+After changing the language, re-run `python install.py` to update slash commands.
 
 ## Roadmap
 

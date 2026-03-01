@@ -3,7 +3,7 @@
 
 # General
 version: "2.9"
-language: "cs"
+language: "en"  # "en" or "cs"
 
 # Paths (auto-detected)
 paths:

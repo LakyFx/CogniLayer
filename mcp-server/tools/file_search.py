@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from db import open_db
 from utils import get_active_session
 from search.fts_search import fts_search_chunks
+from i18n import t
 
 
 def file_search(query: str, scope: str = "project",
@@ -34,13 +35,13 @@ def file_search(query: str, scope: str = "project",
         db.close()
 
     if not results:
-        return f"Zadne chunky nalezeny pro '{query}'. Soubory mozna nebyly zaindexovany."
+        return t("file_search.no_results", query=query)
 
-    lines = [f"## Nalezeno {len(results)} chunku pro '{query}'\n"]
+    lines = [t("file_search.header", count=len(results), query=query)]
 
     for i, r in enumerate(results, 1):
-        section = r["section_title"] or "(bez nadpisu)"
-        line = f"{i}. [{r['file_path']}] sekce: {section}\n"
+        section = r["section_title"] or t("file_search.no_title")
+        line = f"{i}. [{r['file_path']}] {t('file_search.section_label')}: {section}\n"
         # Truncate content to reasonable size
         content = r["content"]
         if len(content) > 500:

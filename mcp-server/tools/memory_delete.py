@@ -5,12 +5,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from db import open_db, ensure_vec
+from i18n import t
 
 
 def memory_delete(ids: list[str]) -> str:
     """Delete facts by their UUIDs."""
     if not ids:
-        return "Zadna ID ke smazani."
+        return t("memory_delete.no_ids")
 
     db = open_db()
     try:
@@ -41,4 +42,4 @@ def memory_delete(ids: list[str]) -> str:
     finally:
         db.close()
 
-    return f"Smazano {deleted} faktu z pameti."
+    return t("memory_delete.deleted", deleted=deleted)

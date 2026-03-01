@@ -75,11 +75,23 @@ def copy_files():
         shutil.copy2(helper_src, COGNILAYER_HOME / "onboard_helper.py")
         print("  [copy] onboard_helper.py")
 
-    # Copy slash commands
-    commands_src = REPO_DIR / "commands"
+    # Copy slash commands (locale-aware)
+    config_dst = COGNILAYER_HOME / "config.yaml"
+    language = "en"
+    if config_dst.exists():
+        try:
+            import yaml
+            with open(config_dst, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f)
+            language = cfg.get("language", "en")
+        except Exception:
+            pass
+    commands_src = REPO_DIR / "commands" / language
+    if not commands_src.exists():
+        commands_src = REPO_DIR / "commands" / "en"
     for src_file in commands_src.glob("*.md"):
         shutil.copy2(src_file, CLAUDE_COMMANDS / src_file.name)
-        print(f"  [copy] commands/{src_file.name}")
+        print(f"  [copy] commands/{language}/{src_file.name}")
 
 
 def init_database():

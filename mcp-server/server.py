@@ -25,6 +25,7 @@ from tools.decision_log import decision_log
 from tools.verify_identity import verify_identity
 from tools.identity_set import identity_set
 from tools.recommend_tech import recommend_tech
+from i18n import t
 
 server = Server("cognilayer")
 
@@ -34,30 +35,26 @@ async def list_tools() -> list[Tool]:
     return [
         Tool(
             name="memory_search",
-            description=(
-                "Prohledej CogniLayer pamet. Najde relevantni informace "
-                "z minulych sessions, rozhodnuti, patterns a faktu. "
-                "Automaticky detekuje STALE fakty (source_file se zmenil)."
-            ),
+            description=t("tool.memory_search.desc"),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Co hledas. Prirozeny jazyk."
+                        "description": t("tool.memory_search.param.query")
                     },
                     "scope": {
                         "type": "string",
-                        "description": "project (default) | all | {project_name}",
+                        "description": t("tool.memory_search.param.scope"),
                         "default": "project"
                     },
                     "type": {
                         "type": "string",
-                        "description": "Typ faktu: decision|fact|pattern|issue|task|skill|gotcha|procedure|error_fix|command|performance|api_contract|dependency|client_rule"
+                        "description": t("tool.memory_search.param.type")
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Max pocet vysledku (default 5, max 10)",
+                        "description": t("tool.memory_search.param.limit"),
                         "default": 5
                     }
                 },
@@ -66,33 +63,30 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="memory_write",
-            description=(
-                "Uloz dulezitou informaci do CogniLayer pameti. "
-                "Pouzivej PROAKTIVNE — ukladej jak se ucis, ne jen pri /harvest."
-            ),
+            description=t("tool.memory_write.desc"),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "content": {
                         "type": "string",
-                        "description": "Co si zapamatovat. Musi byt self-contained."
+                        "description": t("tool.memory_write.param.content")
                     },
                     "type": {
                         "type": "string",
-                        "description": "Typ: fact|decision|pattern|issue|task|skill|gotcha|procedure|error_fix|command|performance|api_contract|dependency|client_rule",
+                        "description": t("tool.memory_write.param.type"),
                         "default": "fact"
                     },
                     "tags": {
                         "type": "string",
-                        "description": "Tagy oddelene carkou."
+                        "description": t("tool.memory_write.param.tags")
                     },
                     "domain": {
                         "type": "string",
-                        "description": "Oblast: auth, ui, deploy, seo..."
+                        "description": t("tool.memory_write.param.domain")
                     },
                     "source_file": {
                         "type": "string",
-                        "description": "Relativni cesta k souboru kde byl fakt pozorovan."
+                        "description": t("tool.memory_write.param.source_file")
                     }
                 },
                 "required": ["content"]
@@ -100,14 +94,14 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="memory_delete",
-            description="Smaz fakty z CogniLayer pameti podle ID.",
+            description=t("tool.memory_delete.desc"),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "ids": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "UUID faktu ke smazani."
+                        "description": t("tool.memory_delete.param.ids")
                     }
                 },
                 "required": ["ids"]
@@ -115,29 +109,26 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="file_search",
-            description=(
-                "Prohledej indexovane projektove soubory (PRD, handoff, docs). "
-                "Vraci relevantni sekce/chunky MISTO celych souboru — setri kontext."
-            ),
+            description=t("tool.file_search.desc"),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Co hledas v projektovych souborech."
+                        "description": t("tool.file_search.param.query")
                     },
                     "scope": {
                         "type": "string",
-                        "description": "project (default) | {project_name}",
+                        "description": t("tool.file_search.param.scope"),
                         "default": "project"
                     },
                     "file_filter": {
                         "type": "string",
-                        "description": "Glob pattern, napr. *.md nebo PRD*"
+                        "description": t("tool.file_search.param.file_filter")
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Max pocet chunku (default 5, max 10)",
+                        "description": t("tool.file_search.param.limit"),
                         "default": 5
                     }
                 },
@@ -146,7 +137,7 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="project_context",
-            description="Vrati Project DNA a aktualni kontext pro detekovany projekt.",
+            description=t("tool.project_context.desc"),
             inputSchema={
                 "type": "object",
                 "properties": {}
@@ -154,18 +145,18 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="session_bridge",
-            description="Nacti nebo uloz session bridge (shrnuti session pro kontinuitu).",
+            description=t("tool.session_bridge.desc"),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "action": {
                         "type": "string",
-                        "description": "load | save",
+                        "description": t("tool.session_bridge.param.action"),
                         "enum": ["load", "save"]
                     },
                     "content": {
                         "type": "string",
-                        "description": "Obsah bridge (pouze pro save)."
+                        "description": t("tool.session_bridge.param.content")
                     }
                 },
                 "required": ["action"]
@@ -173,21 +164,21 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="decision_log",
-            description="Prohledej log rozhodnuti pro aktualni nebo specifikovany projekt.",
+            description=t("tool.decision_log.desc"),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Filtr. Prazdne = posledni rozhodnuti."
+                        "description": t("tool.decision_log.param.query")
                     },
                     "project": {
                         "type": "string",
-                        "description": "Konkretni projekt. Default: aktualni."
+                        "description": t("tool.decision_log.param.project")
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Pocet vysledku (default 5).",
+                        "description": t("tool.decision_log.param.limit"),
                         "default": 5
                     }
                 }
@@ -195,16 +186,13 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="verify_identity",
-            description=(
-                "POVINNE pred jakymkoliv deployem, SSH, push, PM2, DB migraci. "
-                "Overi Identity Card a vrati VERIFIED/BLOCKED/WARNING."
-            ),
+            description=t("tool.verify_identity.desc"),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "action_type": {
                         "type": "string",
-                        "description": "deploy|ssh|push|pm2|db-migrate|docker-remote|proxy-reload|service-mgmt",
+                        "description": t("tool.verify_identity.param.action_type"),
                         "enum": ["deploy", "ssh", "push", "pm2", "db-migrate",
                                  "docker-remote", "proxy-reload", "service-mgmt"]
                     }
@@ -214,17 +202,17 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="identity_set",
-            description="Nastav pole Project Identity Card.",
+            description=t("tool.identity_set.desc"),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "fields": {
                         "type": "object",
-                        "description": "Klice a hodnoty k nastaveni. Napr: {\"deploy_ssh_alias\": \"my-server\", \"deploy_app_port\": 3000}"
+                        "description": t("tool.identity_set.param.fields")
                     },
                     "lock_safety": {
                         "type": "boolean",
-                        "description": "Zamknout safety pole?",
+                        "description": t("tool.identity_set.param.lock_safety"),
                         "default": False
                     }
                 },
@@ -233,21 +221,21 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="recommend_tech",
-            description="Doporuc technologicky stack na zaklade podobnych projektu.",
+            description=t("tool.recommend_tech.desc"),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "description": {
                         "type": "string",
-                        "description": "Popis projektu (jednoduchy web, SaaS...)"
+                        "description": t("tool.recommend_tech.param.description")
                     },
                     "similar_to": {
                         "type": "string",
-                        "description": "Nazev existujiciho projektu k inspiraci."
+                        "description": t("tool.recommend_tech.param.similar_to")
                     },
                     "category": {
                         "type": "string",
-                        "description": "saas-app|agency-site|simple-website|ecommerce|api|cli-tool"
+                        "description": t("tool.recommend_tech.param.category")
                     }
                 }
             }
@@ -309,9 +297,9 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 category=arguments.get("category")
             )
         else:
-            result = f"Neznamy nastroj: {name}"
+            result = t("server.unknown_tool", name=name)
     except Exception as e:
-        result = f"Chyba v {name}: {str(e)}"
+        result = t("server.tool_error", name=name, error=str(e))
 
     return [TextContent(type="text", text=result)]
 

@@ -12,8 +12,19 @@ from pathlib import Path
 COGNILAYER_HOME = Path.home() / ".cognilayer"
 DB_PATH = COGNILAYER_HOME / "memory.db"
 ACTIVE_SESSION_FILE = COGNILAYER_HOME / "active_session.json"
-COGNILAYER_START = "# === COGNILAYER (auto-generated, nemaz) ==="
+
+# Import i18n (must be after COGNILAYER_HOME is defined)
+sys.path.insert(0, str(COGNILAYER_HOME / "mcp-server"))
+try:
+    from i18n import t
+except ImportError:
+    def t(key, **kwargs):
+        return key  # fallback if i18n not installed yet
+
+COGNILAYER_START = f"# === COGNILAYER ({t('claude_md.do_not_delete')}) ==="
 COGNILAYER_END = "# === END COGNILAYER ==="
+# Also match old Czech marker for replacement
+COGNILAYER_START_LEGACY = "# === COGNILAYER (auto-generated, nemaz) ==="
 
 
 def open_db():
@@ -73,17 +84,13 @@ def check_crash_recovery(db, project: str) -> str | None:
         session_id, start_time, changes, last_files = orphan[0], orphan[1], orphan[2], orphan[3]
         db.execute("""
             UPDATE sessions SET end_time = start_time,
-                summary = '[CRASH] Session nebyla korektne ukoncena'
+                summary = ?
             WHERE id = ?
-        """, (session_id,))
-        return (
-            f"## Crash Recovery\n"
-            f"Posledni session ({start_time}) nebyla korektne ukoncena (pad/kill).\n"
-            f"Zaznamenano {changes} zmen souboru pred padem.\n"
-            f"Posledni zmenene soubory: {last_files or 'zadne'}\n"
-            f"Bridge z predposledni session je platny (vyse).\n"
-            f"Pro detail pouzij: memory_search(\"zmeny posledni session\")"
-        )
+        """, (t("crash.session_summary"), session_id))
+        return t("crash.recovery",
+                 start_time=start_time,
+                 changes=changes,
+                 last_files=last_files or t("crash.no_files"))
     return None
 
 
@@ -215,9 +222,9 @@ def get_or_generate_dna(db, project: str, project_path: Path) -> str:
     except Exception:
         pass
 
-    stack = ", ".join(stack_parts) or "neznamy"
+    stack = ", ".join(stack_parts) or t("dna.unknown_stack")
     structure = ", ".join(structure_parts[:8]) or "?"
-    deploy = "[NENASTAVENO]"
+    deploy = t("dna.deploy_not_set")
 
     # Check identity for deploy info
     identity = db.execute("SELECT deploy_ssh_alias, deploy_ssh_host, deploy_app_port, domain_primary FROM project_identity WHERE project = ?", (project,)).fetchone()
@@ -232,11 +239,11 @@ def get_or_generate_dna(db, project: str, project_path: Path) -> str:
     dna = (
         f"## Project DNA: {project}\n"
         f"Stack: {stack}\n"
-        f"Style: [neznamy]\n"
+        f"Style: {t('dna.unknown_style')}\n"
         f"Structure: {structure}\n"
         f"Deploy: {deploy}\n"
-        f"Active: [nova session]\n"
-        f"Last: [prvni session]"
+        f"Active: {t('dna.new_session')}\n"
+        f"Last: {t('dna.first_session')}"
     )
 
     db.execute("UPDATE projects SET dna_content = ?, dna_updated = ? WHERE name = ?",
@@ -277,48 +284,7 @@ def write_active_session(session_id: str, project: str, project_path: str):
 def get_cognilayer_block(dna: str, bridge: str | None, crash_info: str | None) -> str:
     """Build the CLAUDE.md injection block."""
     lines = [COGNILAYER_START, ""]
-    lines.append("""## Pametove nastroje
-Mas pristup k MCP serveru `cognilayer`:
-- memory_search(query) — prohledej pamet semanticky
-- memory_write(content) — zapamatuj si dulezitou informaci
-- file_search(query) — hledej v projektovych souborech (PRD, docs...)
-- decision_log(query) — najdi minula rozhodnuti
-
-Kdyz si nejsi jisty kontextem nebo historii projektu,
-VZDY nejdriv prohledej pamet pomoci memory_search.
-Kdyz potrebujes info z PRD nebo docs, pouzij file_search
-MISTO cteni celeho souboru.
-
-## VERIFY-BEFORE-ACT — POVINNE
-Kdyz memory_search vrati fakt oznaceny ⚠ STALE:
-1. VZDY precti zdrojovy soubor a over ze fakt stale plati
-2. Pokud se fakt zmenil → aktualizuj ho pres memory_write
-3. NIKDY nedelej zmeny na zaklade STALE faktu bez overeni
-
-## PROAKTIVNI PAMET — DULEZITE
-Kdyz behem prace zjistis neco duleziteho, OKAMZITE to uloz:
-- Chyba a oprava → memory_write(type="error_fix")
-- Past/nebezpeci → memory_write(type="gotcha")
-- Presny postup → memory_write(type="procedure")
-- Jak komponenty komunikuji → memory_write(type="api_contract")
-- Vykonovy problem → memory_write(type="performance")
-- Dulezity prikaz → memory_write(type="command")
-NECEKEJ na /harvest — session muze crashnout.
-
-## RUNNING BRIDGE — KRITICKE
-Po kazdem dokonceni ukolu AUTOMATICKY aktualizuj session bridge:
-  session_bridge(action="save", content="Progress: ...; Open: ...")
-Toto je Tier 1 — delej sam, neoznamuj, je to soucast prace.
-
-## Safety pravidla — POVINNE
-- Pred JAKYMKOLIV deployem, push, ssh, pm2, docker, db migraci:
-  1. VZDY nejdriv zavolej verify_identity(action_type="...")
-  2. Pokud vrati BLOCKED — ZASTAV a zeptej se uzivatele
-  3. Pokud vrati VERIFIED — PRECTI uzivateli cilovy server a pozadej potvrzeni
-
-## Git pravidla
-- Commituj casto, male atomicke zmeny. Format: "[typ] co a proc"
-- commit = Tier 1 (delej sam). push = Tier 3 (verify_identity).""")
+    lines.append(t("claude_md.template"))
 
     lines.append("")
     lines.append(dna)
@@ -342,9 +308,16 @@ def inject_cognilayer_block(claude_md_path: Path, dna: str, bridge: str | None, 
 
     if claude_md_path.exists():
         content = claude_md_path.read_text(encoding="utf-8")
-        if COGNILAYER_START in content and COGNILAYER_END in content:
+        # Match current or legacy start marker
+        start_marker = None
+        if COGNILAYER_START in content:
+            start_marker = COGNILAYER_START
+        elif COGNILAYER_START_LEGACY in content:
+            start_marker = COGNILAYER_START_LEGACY
+
+        if start_marker and COGNILAYER_END in content:
             # Replace existing block
-            before = content[:content.index(COGNILAYER_START)]
+            before = content[:content.index(start_marker)]
             after = content[content.index(COGNILAYER_END) + len(COGNILAYER_END):]
             new_content = before + block + after
         else:

@@ -11,6 +11,14 @@ DB_PATH = COGNILAYER_HOME / "memory.db"
 ACTIVE_SESSION_FILE = COGNILAYER_HOME / "active_session.json"
 LOG_PATH = COGNILAYER_HOME / "logs" / "cognilayer.log"
 
+# Import i18n
+sys.path.insert(0, str(COGNILAYER_HOME / "mcp-server"))
+try:
+    from i18n import t
+except ImportError:
+    def t(key, **kwargs):
+        return key
+
 
 def open_db():
     db = sqlite3.connect(str(DB_PATH))
@@ -39,20 +47,20 @@ def build_emergency_bridge(db, session_id: str, project: str) -> str:
         WHERE session_id = ? ORDER BY timestamp
     """, (session_id,)).fetchall()
 
-    lines = ["[Emergency bridge — running bridge nebyl aktualizovan]"]
+    lines = [t("session_end.emergency_header")]
 
     if changed_files:
         file_list = ", ".join(f"{f[0]} ({f[1]})" for f in changed_files[:10])
         lines.append(f"Files: {file_list}")
         if len(changed_files) > 10:
-            lines.append(f"  ... a {len(changed_files) - 10} dalsich")
+            lines.append(t("session_end.and_more", count=len(changed_files) - 10))
 
     if facts:
         facts_summary = "; ".join(f"[{f[0]}] {f[1]}" for f in facts[:5])
         lines.append(f"Facts: {facts_summary}")
 
     if not changed_files and not facts:
-        lines.append("Zadne zmeny ani fakty v teto session.")
+        lines.append(t("session_end.no_changes"))
 
     return "\n".join(lines)
 

@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from db import open_db
 from utils import get_active_session
 from search.fts_search import fts_search_facts
+from i18n import t
 
 
 def _check_staleness(fact: dict, project_path: str) -> str | None:
@@ -118,9 +119,9 @@ def memory_search(query: str, scope: str = "project",
         db.close()
 
     if not results:
-        return f"Zadne vysledky pro '{query}'. Pamet je prazdna nebo dotaz neodpovida zadnym faktum."
+        return t("memory_search.no_results", query=query)
 
-    lines = [f"## Nalezeno {len(results)} vysledku pro '{query}'\n"]
+    lines = [t("memory_search.header", count=len(results), query=query)]
 
     for i, r in enumerate(results, 1):
         staleness = _check_staleness(r, project_path)
@@ -137,13 +138,13 @@ def memory_search(query: str, scope: str = "project",
             line += f"\n   source: {r['source_file']}"
 
         if staleness == "STALE":
-            line += f"\n   ⚠ STALE — source file {r['source_file']} se zmenil od zapisu tohoto faktu!"
-            line += f"\n   → OVER pred pouzitim: Read {r['source_file']}"
+            line += "\n   ⚠ " + t("memory_search.stale", source_file=r['source_file'])
+            line += "\n   " + t("memory_search.stale_hint", source_file=r['source_file'])
         elif staleness == "DELETED":
-            line += f"\n   ⚠ DELETED — source file {r['source_file']} byl smazan!"
+            line += "\n   ⚠ " + t("memory_search.deleted", source_file=r['source_file'])
 
         if r.get("project") != project and scope == "all":
-            line += f"\n   🔗 CROSS-PROJECT — z projektu {r['project']}"
+            line += "\n   \U0001f517 " + t("memory_search.cross_project", project=r['project'])
 
         lines.append(line)
 

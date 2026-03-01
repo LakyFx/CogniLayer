@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from db import open_db
 from utils import get_active_session
+from i18n import t
 
 
 def project_context() -> str:
@@ -14,7 +15,7 @@ def project_context() -> str:
     project = session.get("project", "")
 
     if not project:
-        return "Zadny aktivni projekt. Spust claude v projektovem adresari."
+        return t("project_context.no_project")
 
     db = open_db()
     try:
@@ -25,9 +26,9 @@ def project_context() -> str:
         ).fetchone()
 
         if not proj:
-            return f"Projekt '{project}' neni registrovany v CogniLayer."
+            return t("project_context.not_registered", project=project)
 
-        dna = proj[0] or f"## Project DNA: {project}\n[DNA jeste nebyla vygenerovana]"
+        dna = proj[0] or t("project_context.dna_placeholder", project=project)
 
         # Get latest bridge from last completed session
         bridge_row = db.execute("""
@@ -64,11 +65,9 @@ def project_context() -> str:
     finally:
         db.close()
 
-    stats = f"""
-## Statistiky
-- Faktu v pameti: {facts_count} (hot: {hot_count})
-- Indexovanych chunku: {chunks_count}
-- Sessions: {sessions_count}
-- Zaznamenanych zmen: {changes_count}"""
+    stats = t("project_context.stats",
+              facts_count=facts_count, hot_count=hot_count,
+              chunks_count=chunks_count, sessions_count=sessions_count,
+              changes_count=changes_count)
 
     return f"{dna}{bridge}\n{stats}"
