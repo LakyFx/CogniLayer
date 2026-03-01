@@ -268,6 +268,9 @@ _EN: dict[str, str] = {
     # hooks/on_session_start.py
     # ======================================================================
     "claude_md.template": (
+        "## CogniLayer v3 Active\n"
+        "Persistent memory is ON. Use `/cognihelp` to see all commands.\n"
+        "\n"
         "## Memory Tools\n"
         "You have access to the `cognilayer` MCP server:\n"
         "- memory_search(query) — search memory semantically\n"
@@ -663,6 +666,9 @@ _CS: dict[str, str] = {
     # hooks/on_session_start.py
     # ======================================================================
     "claude_md.template": (
+        "## CogniLayer v3 Aktivni\n"
+        "Trvala pamet je ZAPNUTA. Pouzij `/cognihelp` pro prehled vsech prikazu.\n"
+        "\n"
         "## Pametove nastroje\n"
         "Mas pristup k MCP serveru `cognilayer`:\n"
         "- memory_search(query) — prohledej pamet semanticky\n"
