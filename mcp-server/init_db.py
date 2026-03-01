@@ -1,8 +1,9 @@
-"""CogniLayer v2.9 — Database schema creation.
+"""CogniLayer v3 — Database schema creation and migration.
 
 Run: python init_db.py
-Creates ~/.cognilayer/memory.db with all tables, FTS5 indexes, and regular indexes.
-Phase 1: No sqlite-vec (facts_vec, chunks_vec skipped).
+Creates ~/.cognilayer/memory.db with all tables, FTS5 indexes, vector tables, and regular indexes.
+Supports: FTS5 fulltext, sqlite-vec vectors (optional), fact linking, knowledge gaps,
+clusters, contradictions, causal chains, episode storage.
 """
 
 import sqlite3

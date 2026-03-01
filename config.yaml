@@ -1,8 +1,8 @@
 # ~/.cognilayer/config.yaml
-# CogniLayer v2.9 — Phase 1 (FTS5 only)
+# CogniLayer v3 — FTS5 + vector search, 13 MCP tools
 
 # General
-version: "2.9"
+version: "3.1.0"
 language: "en"  # "en" or "cs"
 
 # Paths (auto-detected)
@@ -48,7 +48,7 @@ indexer:
     - "yarn.lock"
     - "pnpm-lock.yaml"
 
-# Search (Phase 1: FTS5 only)
+# Search (FTS5 + optional vector via fastembed/sqlite-vec)
 search:
   default_limit: 5
   max_limit: 10
