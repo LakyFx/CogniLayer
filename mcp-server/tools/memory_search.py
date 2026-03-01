@@ -65,6 +65,9 @@ def _apply_heat_decay(db, project: str):
 
         try:
             access_time = datetime.fromisoformat(last_access)
+            # Strip timezone to avoid naive/aware mismatch
+            if access_time.tzinfo is not None:
+                access_time = access_time.replace(tzinfo=None)
         except (ValueError, TypeError):
             continue
 

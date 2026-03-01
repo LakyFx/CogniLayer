@@ -68,9 +68,39 @@ def register_project_if_new(db, name: str, path: Path):
                    (datetime.now().isoformat(), name))
 
 
+def build_emergency_bridge(db, session_id: str) -> str:
+    """Build emergency bridge from changes and facts of a crashed session."""
+    changed_files = db.execute("""
+        SELECT DISTINCT file_path, action FROM changes
+        WHERE session_id = ? ORDER BY timestamp
+    """, (session_id,)).fetchall()
+
+    facts = db.execute("""
+        SELECT type, substr(content, 1, 80) FROM facts
+        WHERE session_id = ? ORDER BY timestamp
+    """, (session_id,)).fetchall()
+
+    lines = [t("session_end.emergency_header")]
+
+    if changed_files:
+        file_list = ", ".join(f"{f[0]} ({f[1]})" for f in changed_files[:10])
+        lines.append(f"Files: {file_list}")
+        if len(changed_files) > 10:
+            lines.append(t("session_end.and_more", count=len(changed_files) - 10))
+
+    if facts:
+        facts_summary = "; ".join(f"[{f[0]}] {f[1]}" for f in facts[:5])
+        lines.append(f"Facts: {facts_summary}")
+
+    if not changed_files and not facts:
+        lines.append(t("session_end.no_changes"))
+
+    return "\n".join(lines)
+
+
 def check_crash_recovery(db, project: str) -> str | None:
     orphan = db.execute("""
-        SELECT s.id, s.start_time,
+        SELECT s.id, s.start_time, s.bridge_content,
                (SELECT COUNT(*) FROM changes WHERE session_id = s.id) as change_count,
                (SELECT GROUP_CONCAT(file_path, ', ')
                 FROM (SELECT DISTINCT file_path FROM changes
@@ -81,7 +111,15 @@ def check_crash_recovery(db, project: str) -> str | None:
         ORDER BY start_time DESC LIMIT 1
     """, (project,)).fetchone()
     if orphan:
-        session_id, start_time, changes, last_files = orphan[0], orphan[1], orphan[2], orphan[3]
+        session_id, start_time, bridge_content, changes, last_files = (
+            orphan[0], orphan[1], orphan[2], orphan[3], orphan[4]
+        )
+        # Build emergency bridge if the crashed session has none
+        if not bridge_content:
+            bridge_content = build_emergency_bridge(db, session_id)
+            db.execute("UPDATE sessions SET bridge_content = ? WHERE id = ?",
+                       (bridge_content, session_id))
+        # Close the orphan session
         db.execute("""
             UPDATE sessions SET end_time = start_time,
                 summary = ?
