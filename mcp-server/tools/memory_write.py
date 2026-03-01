@@ -8,7 +8,7 @@ from pathlib import Path
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from db import open_db
+from db import open_db, ensure_vec
 
 
 def _get_active_session():
@@ -21,6 +21,8 @@ def _get_active_session():
 def _embed_fact(db, rowid: int, content: str, tags: str = None, domain: str = None):
     """Generate and store embedding for a fact. Non-blocking — skips on error."""
     try:
+        if not ensure_vec(db):
+            return  # sqlite-vec not available, skip embedding storage
         from embedder import embed_text
         # Combine content with tags/domain for richer embedding
         embed_input = content

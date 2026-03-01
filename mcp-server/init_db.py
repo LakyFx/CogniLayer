@@ -254,7 +254,7 @@ def init_db():
     db_path = get_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    db = open_db()
+    db = open_db(with_vec=True)
     db.executescript(SCHEMA)
     db.commit()
 

@@ -100,7 +100,7 @@ def main():
     print("CogniLayer — Backfill Embeddings")
     print("=" * 40)
 
-    db = open_db()
+    db = open_db(with_vec=True)
     try:
         # Check if vec tables exist
         try:

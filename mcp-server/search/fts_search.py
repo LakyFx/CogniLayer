@@ -4,6 +4,23 @@ import sqlite3
 from pathlib import Path
 
 
+def _ensure_vec(db: sqlite3.Connection) -> bool:
+    """Ensure sqlite-vec is loaded. Returns True if available."""
+    try:
+        db.execute("SELECT vec_version()")
+        return True
+    except Exception:
+        # Try loading it
+        try:
+            import sqlite_vec
+            db.enable_load_extension(True)
+            sqlite_vec.load(db)
+            db.enable_load_extension(False)
+            return True
+        except Exception:
+            return False
+
+
 def _vec_available(db: sqlite3.Connection) -> bool:
     """Check if sqlite-vec is loaded and vector tables exist."""
     try:
@@ -136,8 +153,9 @@ def fts_search_facts(db: sqlite3.Connection, query: str, project: str = None,
 
     where = f"AND {' AND '.join(conditions)}" if conditions else ""
 
-    # FTS5 search (fetch more for hybrid merge)
-    fetch_limit = limit * 3 if _vec_available(db) else limit
+    # FTS5 search (fetch more for hybrid merge if vec available)
+    vec_ready = _ensure_vec(db) and _vec_available(db)
+    fetch_limit = limit * 3 if vec_ready else limit
 
     sql = f"""
         SELECT f.id, f.project, f.content, f.type, f.domain, f.tags,
@@ -179,7 +197,7 @@ def fts_search_facts(db: sqlite3.Connection, query: str, project: str = None,
         })
 
     # Hybrid search: combine with vector results if available
-    if _vec_available(db):
+    if vec_ready:
         try:
             from embedder import embed_text
             query_embedding = embed_text(query)
@@ -210,7 +228,8 @@ def fts_search_chunks(db: sqlite3.Connection, query: str, project: str = None,
 
     where = f"AND {' AND '.join(conditions)}" if conditions else ""
 
-    fetch_limit = limit * 3 if _vec_available(db) else limit
+    vec_ready = _ensure_vec(db) and _vec_available(db)
+    fetch_limit = limit * 3 if vec_ready else limit
 
     sql = f"""
         SELECT fc.id, fc.project, fc.file_path, fc.section_title,
@@ -247,7 +266,7 @@ def fts_search_chunks(db: sqlite3.Connection, query: str, project: str = None,
         })
 
     # Hybrid search
-    if _vec_available(db):
+    if vec_ready:
         try:
             from embedder import embed_text
             query_embedding = embed_text(query)

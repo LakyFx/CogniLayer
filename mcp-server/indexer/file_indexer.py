@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from indexer.chunker import chunk_file
+from db import ensure_vec
 
 # Extensions to index
 DOC_EXTENSIONS = {".md", ".txt", ".json", ".yaml", ".yml", ".toml"}
@@ -112,13 +113,14 @@ def reindex_project(db, project: str, project_path: Path,
 
         # Generate embeddings for new chunks
         try:
-            from embedder import embed_texts
-            embeddings = embed_texts(chunk_texts)
-            for rowid, emb in zip(new_rowids, embeddings):
-                db.execute(
-                    "INSERT OR REPLACE INTO chunks_vec(rowid, embedding) VALUES (?, ?)",
-                    (rowid, emb)
-                )
+            if ensure_vec(db):
+                from embedder import embed_texts
+                embeddings = embed_texts(chunk_texts)
+                for rowid, emb in zip(new_rowids, embeddings):
+                    db.execute(
+                        "INSERT OR REPLACE INTO chunks_vec(rowid, embedding) VALUES (?, ?)",
+                        (rowid, emb)
+                    )
         except Exception:
             pass  # Embedding not available, FTS5 still works
 
