@@ -27,6 +27,13 @@ def memory_delete(ids: list[str]) -> str:
 
             rowid = row[0]
 
+            # Clean up fact links (bidirectional)
+            try:
+                db.execute("DELETE FROM fact_links WHERE source_id = ? OR target_id = ?",
+                           (fact_id, fact_id))
+            except Exception:
+                pass  # fact_links table might not exist yet
+
             # Delete from facts (triggers auto-delete from facts_fts via trigger)
             result = db.execute("DELETE FROM facts WHERE id = ?", (fact_id,))
             deleted += result.rowcount

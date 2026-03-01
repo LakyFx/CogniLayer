@@ -173,6 +173,33 @@ CREATE TABLE IF NOT EXISTS tech_templates (
     updated TEXT NOT NULL
 );
 
+-- Fact links (Zettelkasten — bidirectional)
+CREATE TABLE IF NOT EXISTS fact_links (
+    source_id TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    score REAL NOT NULL,
+    link_type TEXT DEFAULT 'auto',
+    created TEXT NOT NULL,
+    PRIMARY KEY (source_id, target_id),
+    FOREIGN KEY (source_id) REFERENCES facts(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_id) REFERENCES facts(id) ON DELETE CASCADE
+);
+
+-- Knowledge gaps (failed/weak searches)
+CREATE TABLE IF NOT EXISTS knowledge_gaps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project TEXT NOT NULL,
+    query TEXT NOT NULL,
+    search_type TEXT,
+    hit_count INTEGER DEFAULT 0,
+    best_score REAL,
+    first_seen TEXT NOT NULL,
+    last_seen TEXT NOT NULL,
+    times_seen INTEGER DEFAULT 1,
+    resolved INTEGER DEFAULT 0,
+    FOREIGN KEY (project) REFERENCES projects(name)
+);
+
 -- Indexes for fast queries
 CREATE INDEX IF NOT EXISTS idx_facts_project ON facts(project);
 CREATE INDEX IF NOT EXISTS idx_facts_type ON facts(project, type);
@@ -187,6 +214,10 @@ CREATE INDEX IF NOT EXISTS idx_identity_category ON project_identity(project_cat
 CREATE INDEX IF NOT EXISTS idx_identity_ssh ON project_identity(deploy_ssh_alias);
 CREATE INDEX IF NOT EXISTS idx_identity_domain ON project_identity(domain_primary);
 CREATE INDEX IF NOT EXISTS idx_audit_project ON identity_audit_log(project, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_fact_links_source ON fact_links(source_id);
+CREATE INDEX IF NOT EXISTS idx_fact_links_target ON fact_links(target_id);
+CREATE INDEX IF NOT EXISTS idx_gaps_project ON knowledge_gaps(project);
+CREATE INDEX IF NOT EXISTS idx_gaps_resolved ON knowledge_gaps(resolved);
 """
 
 # FTS5 virtual tables and sync triggers (separated for graceful fallback)
@@ -252,6 +283,51 @@ CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vec USING vec0(
 """
 
 
+def upgrade_schema(db):
+    """Add new V3 columns/tables to existing database (safe idempotent migration)."""
+    # New columns on facts table
+    for col, typedef in [
+        ("retrieval_count", "INTEGER DEFAULT 0"),
+        ("last_retrieved", "TEXT"),
+    ]:
+        try:
+            db.execute(f"ALTER TABLE facts ADD COLUMN {col} {typedef}")
+        except Exception:
+            pass  # Column already exists
+
+    # New tables (CREATE IF NOT EXISTS is idempotent)
+    db.executescript("""
+        CREATE TABLE IF NOT EXISTS fact_links (
+            source_id TEXT NOT NULL,
+            target_id TEXT NOT NULL,
+            score REAL NOT NULL,
+            link_type TEXT DEFAULT 'auto',
+            created TEXT NOT NULL,
+            PRIMARY KEY (source_id, target_id),
+            FOREIGN KEY (source_id) REFERENCES facts(id) ON DELETE CASCADE,
+            FOREIGN KEY (target_id) REFERENCES facts(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS knowledge_gaps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project TEXT NOT NULL,
+            query TEXT NOT NULL,
+            search_type TEXT,
+            hit_count INTEGER DEFAULT 0,
+            best_score REAL,
+            first_seen TEXT NOT NULL,
+            last_seen TEXT NOT NULL,
+            times_seen INTEGER DEFAULT 1,
+            resolved INTEGER DEFAULT 0,
+            FOREIGN KEY (project) REFERENCES projects(name)
+        );
+        CREATE INDEX IF NOT EXISTS idx_fact_links_source ON fact_links(source_id);
+        CREATE INDEX IF NOT EXISTS idx_fact_links_target ON fact_links(target_id);
+        CREATE INDEX IF NOT EXISTS idx_gaps_project ON knowledge_gaps(project);
+        CREATE INDEX IF NOT EXISTS idx_gaps_resolved ON knowledge_gaps(resolved);
+    """)
+    db.commit()
+
+
 def rebuild_fts(db):
     """Rebuild FTS5 indexes from source tables."""
     try:
@@ -270,6 +346,9 @@ def init_db():
     db = open_db(with_vec=True)
     db.executescript(SCHEMA)
     db.commit()
+
+    # Migrate existing databases to V3 schema
+    upgrade_schema(db)
 
     # Create FTS5 virtual tables and triggers (graceful if FTS5 unavailable)
     try:

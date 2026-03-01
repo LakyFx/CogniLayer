@@ -36,13 +36,21 @@ def _escape_fts5(query: str) -> str:
 
 def _fact_row_to_dict(row) -> dict:
     """Convert a facts row to dict using column names."""
-    return {
+    d = {
         "id": row["id"], "project": row["project"], "content": row["content"],
         "type": row["type"], "domain": row["domain"], "tags": row["tags"],
         "timestamp": row["timestamp"], "heat_score": row["heat_score"],
         "source_file": row["source_file"], "source_mtime": row["source_mtime"],
         "session_id": row["session_id"], "rowid": row["rowid"],
     }
+    # V3 columns — graceful fallback for pre-migration DBs
+    try:
+        d["retrieval_count"] = row["retrieval_count"] or 0
+        d["last_retrieved"] = row["last_retrieved"]
+    except (IndexError, KeyError):
+        d["retrieval_count"] = 0
+        d["last_retrieved"] = None
+    return d
 
 
 def _chunk_row_to_dict(row) -> dict:
@@ -156,7 +164,7 @@ def _hybrid_rank(fts_results: list[dict], vec_distances: dict[int, float],
 
 # --- Facts search ---
 
-_FACTS_COLUMNS = "id, project, content, type, domain, tags, timestamp, heat_score, source_file, source_mtime, session_id, rowid"
+_FACTS_COLUMNS = "id, project, content, type, domain, tags, timestamp, heat_score, source_file, source_mtime, session_id, rowid, retrieval_count, last_retrieved"
 
 
 def fts_search_facts(db: sqlite3.Connection, query: str, project: str = None,

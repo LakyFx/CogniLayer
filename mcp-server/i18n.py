@@ -117,6 +117,7 @@ _EN: dict[str, str] = {
     "memory_search.stale_hint": "-> VERIFY before using: Read {source_file}",
     "memory_search.deleted": "DELETED — source file {source_file} was deleted!",
     "memory_search.cross_project": "CROSS-PROJECT — from project {project}",
+    "memory_search.linked_fact": "[{id}] {preview}",
 
     # ======================================================================
     # memory_write.py
@@ -130,6 +131,16 @@ _EN: dict[str, str] = {
     # ======================================================================
     "memory_delete.no_ids": "No IDs to delete.",
     "memory_delete.deleted": "Deleted {deleted} facts from memory.",
+
+    # ======================================================================
+    # memory_link.py
+    # ======================================================================
+    "tool.memory_link.desc": "Manually link two facts in CogniLayer memory.",
+    "tool.memory_link.param.source_id": "UUID of the source fact.",
+    "tool.memory_link.param.target_id": "UUID of the target fact.",
+    "memory_link.not_found": "Fact not found: {id}",
+    "memory_link.already_linked": "Already linked: '{source}' <-> '{target}'",
+    "memory_link.linked": "Linked: '{source}' <-> '{target}'",
 
     # ======================================================================
     # file_search.py
@@ -152,6 +163,13 @@ _EN: dict[str, str] = {
         "- Sessions: {sessions_count}\n"
         "- Recorded changes: {changes_count}"
     ),
+    "project_context.health_header": "\n## Memory Health\n",
+    "project_context.health_stats": "- Total: {total} | Hot: {hot} | Warm: {warm} | Cold: {cold}",
+    "project_context.most_retrieved": "- Most retrieved: \"{content}\" ({count}x)",
+    "project_context.never_retrieved": "- Never retrieved: {count} facts",
+    "project_context.gaps_header": "## Knowledge Gaps (unresolved)",
+    "project_context.gaps_item": "- \"{query}\" (asked {times}x)",
+    "project_context.no_gaps": "## Knowledge Gaps\nNo unresolved gaps.",
 
     # ======================================================================
     # session_bridge.py
@@ -410,6 +428,7 @@ _CS: dict[str, str] = {
     "memory_search.stale_hint": "-> OVER pred pouzitim: Read {source_file}",
     "memory_search.deleted": "DELETED — source file {source_file} byl smazan!",
     "memory_search.cross_project": "CROSS-PROJECT — z projektu {project}",
+    "memory_search.linked_fact": "[{id}] {preview}",
 
     # ======================================================================
     # memory_write.py
@@ -423,6 +442,16 @@ _CS: dict[str, str] = {
     # ======================================================================
     "memory_delete.no_ids": "Zadna ID ke smazani.",
     "memory_delete.deleted": "Smazano {deleted} faktu z pameti.",
+
+    # ======================================================================
+    # memory_link.py
+    # ======================================================================
+    "tool.memory_link.desc": "Manualne propoj dva fakty v CogniLayer pameti.",
+    "tool.memory_link.param.source_id": "UUID zdrojoveho faktu.",
+    "tool.memory_link.param.target_id": "UUID ciloveho faktu.",
+    "memory_link.not_found": "Fakt nenalezen: {id}",
+    "memory_link.already_linked": "Uz propojeno: '{source}' <-> '{target}'",
+    "memory_link.linked": "Propojeno: '{source}' <-> '{target}'",
 
     # ======================================================================
     # file_search.py
@@ -445,6 +474,13 @@ _CS: dict[str, str] = {
         "- Sessions: {sessions_count}\n"
         "- Zaznamenanych zmen: {changes_count}"
     ),
+    "project_context.health_header": "\n## Zdravi pameti\n",
+    "project_context.health_stats": "- Celkem: {total} | Hot: {hot} | Warm: {warm} | Cold: {cold}",
+    "project_context.most_retrieved": "- Nejcasteji vyhledavano: \"{content}\" ({count}x)",
+    "project_context.never_retrieved": "- Nikdy nevyhledano: {count} faktu",
+    "project_context.gaps_header": "## Mezery ve znalostech (nevyresene)",
+    "project_context.gaps_item": "- \"{query}\" (dotazano {times}x)",
+    "project_context.no_gaps": "## Mezery ve znalostech\nZadne nevyresene mezery.",
 
     # ======================================================================
     # session_bridge.py

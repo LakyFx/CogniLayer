@@ -1,7 +1,7 @@
-"""CogniLayer MCP Server — Phase 1 (FTS5 only).
+"""CogniLayer MCP Server — V3 (FTS5 + vector + linking + gap tracking).
 
 Entry point for the MCP server registered in ~/.claude/settings.json.
-Provides 10 tools for Claude Code to interact with CogniLayer memory.
+Provides 11 tools for Claude Code to interact with CogniLayer memory.
 """
 
 import sys
@@ -25,6 +25,7 @@ from tools.decision_log import decision_log
 from tools.verify_identity import verify_identity
 from tools.identity_set import identity_set
 from tools.recommend_tech import recommend_tech
+from tools.memory_link import memory_link
 from i18n import t
 
 server = Server("cognilayer")
@@ -240,6 +241,24 @@ async def list_tools() -> list[Tool]:
                 }
             }
         ),
+        Tool(
+            name="memory_link",
+            description=t("tool.memory_link.desc"),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "source_id": {
+                        "type": "string",
+                        "description": t("tool.memory_link.param.source_id")
+                    },
+                    "target_id": {
+                        "type": "string",
+                        "description": t("tool.memory_link.param.target_id")
+                    }
+                },
+                "required": ["source_id", "target_id"]
+            }
+        ),
     ]
 
 
@@ -296,6 +315,11 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 similar_to=arguments.get("similar_to"),
                 category=arguments.get("category")
             )
+        elif name == "memory_link":
+            result = memory_link(
+                source_id=arguments["source_id"],
+                target_id=arguments["target_id"]
+            )
         else:
             result = t("server.unknown_tool", name=name)
     except Exception as e:
@@ -327,10 +351,10 @@ def test_tools():
 if __name__ == "__main__":
     if "--test" in sys.argv:
         count = test_tools()
-        if count == 10:
+        if count == 11:
             print(f"\nOK: All {count} tools registered.")
         else:
-            print(f"\nERROR: Expected 10 tools, got {count}.")
+            print(f"\nERROR: Expected 11 tools, got {count}.")
             sys.exit(1)
     else:
         import asyncio
