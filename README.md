@@ -96,9 +96,6 @@ That's it. Next time you start Claude Code, CogniLayer is active.
 ```bash
 # AI-powered vector search (recommended — finds facts even with different wording)
 pip install fastembed sqlite-vec
-
-# Visual dashboard
-pip install textual
 ```
 
 ### 3. Optional: Add Codex CLI support
@@ -118,7 +115,7 @@ python ~/.cognilayer/mcp-server/server.py --test
 ### Requirements
 - Python 3.11+
 - Claude Code and/or Codex CLI
-- pip packages: `mcp`, `pyyaml` (installed automatically)
+- pip packages: `mcp`, `pyyaml`, `textual` (installed automatically), `fastembed`, `sqlite-vec` (optional)
 
 ---
 

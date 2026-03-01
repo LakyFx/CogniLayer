@@ -65,8 +65,9 @@ def check_textual_installed():
         import textual  # noqa: F401
         print(f"[ok] textual package found (v{textual.__version__})")
     except ImportError:
-        print("[info] textual not found (optional — needed for TUI dashboard)")
-        print("       Install with: pip install textual")
+        print("[!] textual not found. Installing (needed for TUI dashboard)...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "textual"])
+        print("[ok] textual installed")
 
 
 def backup_database():
