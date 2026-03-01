@@ -142,18 +142,25 @@ A visual memory browser right in your terminal. 7 tabs, keyboard navigation, wor
 ```bash
 cognilayer                    # All projects
 cognilayer --project my-app   # Specific project
-cognilayer --demo             # Demo mode with sample data (for screenshots)
+cognilayer --demo             # Demo mode with sample data (try it!)
 ```
 
-| Tab | What you see |
-|-----|-------------|
-| **Overview** | Stats grid, memory health (hot/warm/cold), last session summary |
-| **Facts** | Searchable fact list with type, domain, and tier filters |
-| **Heatmap** | Heat score distribution — which facts are hot, which are fading |
-| **Clusters** | Related facts grouped into knowledge clusters |
-| **Timeline** | Session history with episodes and outcomes |
-| **Gaps** | Knowledge gaps — searches that found nothing (things you should document) |
-| **Contradictions** | Conflicting facts to review and resolve |
+### Overview — stats at a glance
+![Overview](docs/screenshots/overview.jpg)
+
+### Facts — searchable, filterable, color-coded by heat
+![Facts](docs/screenshots/facts.jpg)
+
+### Heatmap — see which knowledge is hot, warm, or cold
+![Heatmap](docs/screenshots/heatmap.jpg)
+
+### Clusters — related facts organized into groups
+![Clusters](docs/screenshots/clusters.jpg)
+
+### Timeline — full session history with outcomes
+![Timeline](docs/screenshots/timeline.jpg)
+
+*Screenshots show demo mode (`cognilayer --demo`) with sample data.*
 
 ---
 
