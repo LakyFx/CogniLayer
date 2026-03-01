@@ -36,7 +36,7 @@ def read_active_session():
     return "", ""
 
 
-def build_emergency_bridge(db, session_id: str, project: str) -> str:
+def build_emergency_bridge(db, session_id: str) -> str:
     changed_files = db.execute("""
         SELECT DISTINCT file_path, action FROM changes
         WHERE session_id = ? ORDER BY timestamp
@@ -100,12 +100,13 @@ def main():
             UPDATE sessions SET changes_count = ?, facts_count = ? WHERE id = ?
         """, (changes_count, facts_count, session_id))
 
-        existing_bridge = db.execute(
+        row = db.execute(
             "SELECT bridge_content FROM sessions WHERE id = ?", (session_id,)
-        ).fetchone()[0]
+        ).fetchone()
+        existing_bridge = row[0] if row else None
 
         if not existing_bridge:
-            emergency_bridge = build_emergency_bridge(db, session_id, project_name)
+            emergency_bridge = build_emergency_bridge(db, session_id)
             db.execute("UPDATE sessions SET bridge_content = ? WHERE id = ?",
                        (emergency_bridge, session_id))
 

@@ -1,7 +1,6 @@
 """memory_write — Store facts into CogniLayer memory with vector embeddings."""
 
 import uuid
-import os
 from datetime import datetime
 from pathlib import Path
 

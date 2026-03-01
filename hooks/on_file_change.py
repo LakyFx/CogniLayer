@@ -23,7 +23,7 @@ def main():
 
     tool_name = hook_input.get("tool_name", "")
     tool_input = hook_input.get("tool_input", {})
-    file_path = tool_input.get("file_path", "")
+    file_path = tool_input.get("file_path", "") or tool_input.get("notebook_path", "")
 
     if not file_path:
         return
@@ -61,9 +61,13 @@ def main():
             VALUES (?, ?, ?, ?, ?)
         """, (session_id, project_name, rel_path, action, datetime.now().isoformat()))
         db.commit()
-        db.close()
     except Exception:
         pass
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

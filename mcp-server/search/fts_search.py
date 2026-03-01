@@ -242,8 +242,9 @@ def fts_search_facts(db: sqlite3.Connection, query: str, project: str = None,
                         if row:
                             fts_results.append(_fact_row_to_dict(row))
                 fts_results = _hybrid_rank(fts_results, vec_distances)
-        except Exception:
-            pass  # Vector search failed, use FTS5 only
+        except Exception as e:
+            import sys
+            print(f"[CogniLayer] Vector search failed, using FTS5 only: {e}", file=sys.stderr)
 
     return fts_results[:limit]
 
@@ -332,7 +333,8 @@ def fts_search_chunks(db: sqlite3.Connection, query: str, project: str = None,
                         if row:
                             fts_results.append(_chunk_row_to_dict(row))
                 fts_results = _hybrid_rank(fts_results, vec_distances)
-        except Exception:
-            pass
+        except Exception as e:
+            import sys
+            print(f"[CogniLayer] Vector search failed, using FTS5 only: {e}", file=sys.stderr)
 
     return fts_results[:limit]

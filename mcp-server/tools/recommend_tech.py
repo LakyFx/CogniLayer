@@ -1,6 +1,5 @@
 """recommend_tech — Recommend tech stack based on similar projects."""
 
-import json
 import sys
 from pathlib import Path
 

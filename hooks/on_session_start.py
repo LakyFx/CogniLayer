@@ -152,7 +152,7 @@ def auto_detect_identity(db, project: str, project_path: Path):
                 card["framework"] = f"nextjs-{ver}"
                 card["language"] = "typescript" if "typescript" in deps else "javascript"
             if "tailwindcss" in deps:
-                ver = deps["tailwindcss"].lstrip("^~")[0]
+                ver = deps["tailwindcss"].lstrip("^~").split(".")[0]
                 card["css_approach"] = f"tailwind-v{ver}"
             if "better-sqlite3" in deps:
                 card["db_technology"] = "better-sqlite3"
@@ -185,7 +185,7 @@ def auto_detect_identity(db, project: str, project_path: Path):
             pass
 
     # Docker detection
-    if (project_path / "docker-compose.yml").exists():
+    if (project_path / "docker-compose.yml").exists() or (project_path / "docker-compose.yaml").exists():
         card["containerization"] = "docker-compose"
         card["hosting_pattern"] = "docker"
 
@@ -230,7 +230,6 @@ def get_or_generate_dna(db, project: str, project_path: Path) -> str:
 
     # Generate deterministic DNA from project files
     stack_parts = []
-    style_parts = []
     structure_parts = []
 
     pkg = project_path / "package.json"
@@ -269,11 +268,6 @@ def get_or_generate_dna(db, project: str, project_path: Path) -> str:
     if identity and identity[0]:
         deploy = f"ssh {identity[0]} ({identity[1]}), port {identity[2]}, {identity[3] or '?'}"
 
-    dna = (
-        f"## Project DNA: {project}\n"
-        f"Stack: {stack}\n"
-        f"Structure: /{', /'.join(structure_parts[:6])}\n" if structure_parts else f"## Project DNA: {project}\nStack: {stack}\n"
-    )
     dna = (
         f"## Project DNA: {project}\n"
         f"Stack: {stack}\n"

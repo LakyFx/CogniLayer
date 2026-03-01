@@ -1,7 +1,6 @@
 """Register CogniLayer in Claude Code settings.json."""
 
 import json
-import sys
 from pathlib import Path
 
 CLAUDE_SETTINGS = Path.home() / ".claude" / "settings.json"
@@ -36,26 +35,34 @@ def register():
     hook_end = f"python {home_str}/hooks/on_session_end.py"
     hook_change = f"python {home_str}/hooks/on_file_change.py"
 
-    settings["hooks"]["SessionStart"] = [
-        {
+    cognilayer_hooks = {
+        "SessionStart": {
             "matcher": "*",
             "hooks": [{"type": "command", "command": hook_start}]
-        }
-    ]
-
-    settings["hooks"]["SessionEnd"] = [
-        {
+        },
+        "SessionEnd": {
             "matcher": "*",
             "hooks": [{"type": "command", "command": hook_end}]
-        }
-    ]
-
-    settings["hooks"]["PostToolUse"] = [
-        {
+        },
+        "PostToolUse": {
             "matcher": "Write|Edit|NotebookEdit",
             "hooks": [{"type": "command", "command": hook_change}]
-        }
-    ]
+        },
+    }
+
+    for hook_type, new_entry in cognilayer_hooks.items():
+        existing = settings.get("hooks", {}).get(hook_type, [])
+        # Remove any existing CogniLayer entries
+        filtered = [
+            entry for entry in existing
+            if not any(
+                "cognilayer" in h.get("command", "") or ".cognilayer" in h.get("command", "")
+                for h in entry.get("hooks", [])
+            )
+        ]
+        # Append the new CogniLayer hook entry
+        filtered.append(new_entry)
+        settings["hooks"][hook_type] = filtered
 
     # Write back
     CLAUDE_SETTINGS.parent.mkdir(parents=True, exist_ok=True)

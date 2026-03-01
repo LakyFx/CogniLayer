@@ -316,8 +316,8 @@ def test_tools():
     async def _test():
         tools = await list_tools()
         print(f"Registered tools: {len(tools)}")
-        for t in tools:
-            print(f"  - {t.name}: {t.description[:60]}...")
+        for tool in tools:
+            print(f"  - {tool.name}: {tool.description[:60]}...")
         return len(tools)
 
     count = asyncio.run(_test())

@@ -270,9 +270,6 @@ def init_db():
     tables = [r[0] for r in db.execute(
         "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
     ).fetchall()]
-    vtables = [r[0] for r in db.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND sql LIKE '%virtual%' ORDER BY name"
-    ).fetchall()]
     all_names = [r[0] for r in db.execute(
         "SELECT name FROM sqlite_master ORDER BY name"
     ).fetchall()]

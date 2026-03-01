@@ -1,7 +1,5 @@
 """memory_search — Hybrid search (FTS5 + vector) with staleness detection and heat decay."""
 
-import math
-import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -128,7 +126,7 @@ def memory_search(query: str, scope: str = "project",
 
     for i, r in enumerate(results, 1):
         staleness = _check_staleness(r, project_path)
-        heat = r['heat_score'] if r['heat_score'] else 1.0
+        heat = r['heat_score'] if r['heat_score'] is not None else 1.0
         heat_lbl = _heat_label(heat)
 
         line = f"{i}. [{r['type']}] {r['content']}\n"

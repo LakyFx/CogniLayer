@@ -26,6 +26,16 @@ def check_mcp_installed():
         print("[ok] mcp installed")
 
 
+def check_pyyaml_installed():
+    try:
+        import yaml  # noqa: F401
+        print("[ok] pyyaml package found")
+    except ImportError:
+        print("[!] pyyaml package not found. Installing...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyyaml"])
+        print("[ok] pyyaml installed")
+
+
 def copy_files():
     """Copy source files to ~/.cognilayer/"""
     dirs_to_create = [
@@ -36,7 +46,6 @@ def copy_files():
         COGNILAYER_HOME / "hooks",
         COGNILAYER_HOME / "logs",
         COGNILAYER_HOME / "cache" / "embeddings",
-        COGNILAYER_HOME / "scripts",
         CLAUDE_COMMANDS,
     ]
     for d in dirs_to_create:
@@ -133,6 +142,7 @@ def main():
 
     print("\n[2/5] Checking dependencies...")
     check_mcp_installed()
+    check_pyyaml_installed()
 
     print("\n[3/5] Copying files...")
     copy_files()
