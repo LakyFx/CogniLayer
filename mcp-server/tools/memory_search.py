@@ -1,8 +1,9 @@
-"""memory_search — FTS5 search on facts, with staleness detection."""
+"""memory_search — Hybrid search (FTS5 + vector) with staleness detection and heat decay."""
 
 import json
+import math
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import sys
@@ -31,9 +32,69 @@ def _check_staleness(fact: dict, project_path: str) -> str | None:
     return None
 
 
+def _heat_label(score: float) -> str:
+    """Classify heat score into hot/warm/cold."""
+    if score >= 0.7:
+        return "hot"
+    elif score >= 0.3:
+        return "warm"
+    return "cold"
+
+
+def _apply_heat_decay(db, project: str):
+    """Apply time-based heat decay to all facts in the project.
+
+    Decay formula: heat = heat * decay_factor
+    - Facts accessed in last 24h: no decay
+    - Facts accessed 1-7 days ago: decay 0.95
+    - Facts accessed 7-30 days ago: decay 0.85
+    - Facts accessed 30+ days ago: decay 0.70
+    - Minimum heat: 0.05 (never fully forgotten)
+    """
+    now = datetime.now()
+    thresholds = [
+        (timedelta(days=1), 1.0),     # <24h: no decay
+        (timedelta(days=7), 0.95),    # 1-7 days
+        (timedelta(days=30), 0.85),   # 7-30 days
+        (None, 0.70),                  # 30+ days
+    ]
+
+    rows = db.execute("""
+        SELECT id, heat_score, last_accessed, timestamp
+        FROM facts WHERE project = ? AND heat_score > 0.05
+    """, (project,)).fetchall()
+
+    for row in rows:
+        fact_id = row[0]
+        heat = row[1] or 1.0
+        last_access = row[2] or row[3]  # fallback to creation time
+
+        try:
+            access_time = datetime.fromisoformat(last_access)
+        except (ValueError, TypeError):
+            continue
+
+        age = now - access_time
+        decay_factor = 1.0
+        for threshold, factor in thresholds:
+            if threshold is None or age <= threshold:
+                decay_factor = factor
+                break
+
+        if decay_factor < 1.0:
+            new_heat = max(0.05, heat * decay_factor)
+            if abs(new_heat - heat) > 0.001:
+                db.execute(
+                    "UPDATE facts SET heat_score = ? WHERE id = ?",
+                    (new_heat, fact_id)
+                )
+
+    db.commit()
+
+
 def memory_search(query: str, scope: str = "project",
                   type: str = None, limit: int = 5) -> str:
-    """Search CogniLayer memory using FTS5."""
+    """Search CogniLayer memory using hybrid FTS5 + vector search."""
     session = _get_active_session()
     project = session.get("project", "")
     project_path = session.get("project_path", "")
@@ -42,12 +103,16 @@ def memory_search(query: str, scope: str = "project",
 
     db = open_db()
     try:
+        # Apply heat decay before searching
+        if project:
+            _apply_heat_decay(db, project)
+
         results = fts_search_facts(
             db, query, project=project, fact_type=type,
             limit=limit, scope=scope
         )
 
-        # Update heat_score for accessed facts
+        # Boost accessed facts' heat score
         now = datetime.now().isoformat()
         for r in results:
             db.execute("""
@@ -66,10 +131,14 @@ def memory_search(query: str, scope: str = "project",
 
     for i, r in enumerate(results, 1):
         staleness = _check_staleness(r, project_path)
-        heat = f"{r['heat_score']:.2f}" if r['heat_score'] else "1.00"
+        heat = r['heat_score'] if r['heat_score'] else 1.0
+        heat_lbl = _heat_label(heat)
 
         line = f"{i}. [{r['type']}] {r['content']}\n"
-        line += f"   (projekt: {r['project']}, {r['timestamp'][:10]}, heat: {heat})"
+        line += f"   (projekt: {r['project']}, {r['timestamp'][:10]}, heat: {heat:.2f} [{heat_lbl}])"
+
+        if r.get("_hybrid_score") is not None:
+            line += f" hybrid: {r['_hybrid_score']:.2f}"
 
         if r['source_file']:
             line += f"\n   source: {r['source_file']}"

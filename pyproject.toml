@@ -1,6 +1,6 @@
 [project]
 name = "cognilayer"
-version = "2.9.0"
+version = "3.0.0"
 description = "Persistent memory for Claude Code — MCP server + hooks that give Claude long-term memory across sessions"
 readme = "README.md"
 license = "GPL-3.0-or-later"
@@ -20,9 +20,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/YOUR_USERNAME/CogniLayer"
-Repository = "https://github.com/YOUR_USERNAME/CogniLayer"
-Issues = "https://github.com/YOUR_USERNAME/CogniLayer/issues"
+Homepage = "https://github.com/LakyFx/CogniLayer"
+Repository = "https://github.com/LakyFx/CogniLayer"
+Issues = "https://github.com/LakyFx/CogniLayer/issues"
 
 [build-system]
 requires = ["setuptools>=68.0"]

@@ -237,6 +237,17 @@ CREATE INDEX IF NOT EXISTS idx_identity_domain ON project_identity(domain_primar
 CREATE INDEX IF NOT EXISTS idx_audit_project ON identity_audit_log(project, timestamp DESC);
 """
 
+# Phase 2: Vector tables (require sqlite-vec extension)
+VEC_SCHEMA = """
+CREATE VIRTUAL TABLE IF NOT EXISTS facts_vec USING vec0(
+    embedding float[384]
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vec USING vec0(
+    embedding float[384]
+);
+"""
+
 
 def init_db():
     """Create all tables and indexes."""
@@ -246,6 +257,14 @@ def init_db():
     db = open_db()
     db.executescript(SCHEMA)
     db.commit()
+
+    # Phase 2: Create vector tables if sqlite-vec is available
+    try:
+        db.execute("SELECT vec_version()")
+        db.executescript(VEC_SCHEMA)
+        db.commit()
+    except Exception:
+        pass  # sqlite-vec not loaded, skip vector tables
 
     # Verify
     tables = [r[0] for r in db.execute(

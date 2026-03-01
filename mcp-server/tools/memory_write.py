@@ -1,4 +1,4 @@
-"""memory_write — Store facts into CogniLayer memory."""
+"""memory_write — Store facts into CogniLayer memory with vector embeddings."""
 
 import json
 import uuid
@@ -18,6 +18,25 @@ def _get_active_session():
     return {}
 
 
+def _embed_fact(db, rowid: int, content: str, tags: str = None, domain: str = None):
+    """Generate and store embedding for a fact. Non-blocking — skips on error."""
+    try:
+        from embedder import embed_text
+        # Combine content with tags/domain for richer embedding
+        embed_input = content
+        if tags:
+            embed_input += f" [{tags}]"
+        if domain:
+            embed_input += f" [{domain}]"
+        embedding = embed_text(embed_input)
+        db.execute(
+            "INSERT OR REPLACE INTO facts_vec(rowid, embedding) VALUES (?, ?)",
+            (rowid, embedding)
+        )
+    except Exception:
+        pass  # Embedding failed, FTS5 still works
+
+
 def memory_write(content: str, type: str = "fact", tags: str = None,
                  domain: str = None, source_file: str = None) -> str:
     """Write a fact to CogniLayer memory with deduplication."""
@@ -31,7 +50,7 @@ def memory_write(content: str, type: str = "fact", tags: str = None,
         # Deduplication: check for existing fact with same source_file + type
         if source_file and type:
             existing = db.execute("""
-                SELECT id, content FROM facts
+                SELECT id, content, rowid FROM facts
                 WHERE project = ? AND source_file = ? AND type = ?
             """, (project, source_file, type)).fetchone()
 
@@ -50,6 +69,8 @@ def memory_write(content: str, type: str = "fact", tags: str = None,
                     _get_mtime(project_path, source_file),
                     existing[0]
                 ))
+                # Update embedding
+                _embed_fact(db, existing[2], content, tags, domain)
                 db.commit()
                 return f"Aktualizovano v pameti: {content[:60]}... [projekt: {project}, typ: {type}]"
 
@@ -67,6 +88,11 @@ def memory_write(content: str, type: str = "fact", tags: str = None,
             datetime.now().isoformat(), session_id,
             source_file, source_mtime
         ))
+
+        # Get rowid for vector table and embed
+        rowid = db.execute("SELECT rowid FROM facts WHERE id = ?", (fact_id,)).fetchone()[0]
+        _embed_fact(db, rowid, content, tags, domain)
+
         db.commit()
     finally:
         db.close()

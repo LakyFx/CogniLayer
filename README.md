@@ -66,24 +66,40 @@ Stores deployment configuration (SSH, ports, domains, PM2 processes) with:
 ### Crash Recovery
 If a session crashes (kill, timeout, error), the next session detects the orphan and builds an emergency bridge from the change log.
 
+### Hybrid Search (Phase 2)
+- **FTS5** fulltext search for keyword matching
+- **Vector embeddings** via [fastembed](https://github.com/qdrant/fastembed) (CPU-only, ONNX, no GPU needed)
+- **sqlite-vec** for vector storage directly in SQLite
+- Hybrid ranker combines both scores (40% FTS5 + 60% vector similarity)
+- Finds semantically similar facts even when keywords don't match
+
+### Heat Decay
+Facts have a "temperature" that changes over time:
+- **Hot** (0.7-1.0) — recently accessed, high relevance
+- **Warm** (0.3-0.7) — moderately recent
+- **Cold** (0.05-0.3) — old, rarely accessed
+- Decay runs automatically on every search
+- Accessed facts get a heat boost (+0.2)
+
 ### Zero Configuration
 - No daemon, no server to run
 - SQLite with WAL mode — zero setup, works everywhere
 - Auto-detects project name, framework, tech stack from project files
-- FTS5 fulltext search — no external dependencies
+- Phase 1 (FTS5 only) works with zero extra dependencies
+- Phase 2 (hybrid search) needs: `pip install fastembed sqlite-vec`
 
 ## Installation
 
 ### Requirements
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
 - Python 3.10+
-- pip packages: `mcp`
+- pip packages: `mcp` (required), `fastembed sqlite-vec` (optional, for vector search)
 
 ### Quick Install
 
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_USERNAME/CogniLayer.git
+git clone https://github.com/LakyFx/CogniLayer.git
 cd CogniLayer
 
 # Install
@@ -229,17 +245,24 @@ search:
 
 ## Roadmap
 
-### Phase 1 (Current)
+### Phase 1 (Complete)
 - SQLite + FTS5 fulltext search
 - 10 MCP tools, 3 hooks, 7 slash commands
 - Session bridges and crash recovery
 - Identity Card with safety locking
 
-### Phase 2 (Planned)
-- Vector embeddings via [fastembed](https://github.com/qdrant/fastembed) (CPU-only, no server)
-- Hybrid search (FTS5 + vector ranking)
-- Heat decay (temporal aging of facts: hot/warm/cold)
-- sqlite-vec for vector storage
+### Phase 2 (Complete)
+- Vector embeddings via [fastembed](https://github.com/qdrant/fastembed) (CPU-only, ONNX)
+- [sqlite-vec](https://github.com/asg017/sqlite-vec) for vector storage
+- Hybrid search (FTS5 + vector ranking with configurable weights)
+- Heat decay (temporal aging: hot/warm/cold)
+- Backfill script for embedding existing facts/chunks
+
+### Phase 3 (Ideas)
+- Web UI dashboard for memory browsing
+- Multi-user support
+- Export/import memory between machines
+- Custom embedding models
 
 ## Contributing
 

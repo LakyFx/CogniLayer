@@ -91,7 +91,9 @@ def reindex_project(db, project: str, project_path: Path,
             (project, rel_path)
         )
 
-        # Insert new chunks
+        # Insert new chunks + embeddings
+        new_rowids = []
+        chunk_texts = []
         for chunk in chunks:
             db.execute("""
                 INSERT INTO file_chunks (project, file_path, file_mtime,
@@ -101,6 +103,24 @@ def reindex_project(db, project: str, project_path: Path,
                 project, rel_path, current_mtime,
                 chunk["section_title"], chunk["chunk_index"], chunk["content"]
             ))
+            rowid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+            new_rowids.append(rowid)
+            text = chunk["content"]
+            if chunk["section_title"]:
+                text = f"{chunk['section_title']}: {text}"
+            chunk_texts.append(text)
+
+        # Generate embeddings for new chunks
+        try:
+            from embedder import embed_texts
+            embeddings = embed_texts(chunk_texts)
+            for rowid, emb in zip(new_rowids, embeddings):
+                db.execute(
+                    "INSERT OR REPLACE INTO chunks_vec(rowid, embedding) VALUES (?, ?)",
+                    (rowid, emb)
+                )
+        except Exception:
+            pass  # Embedding not available, FTS5 still works
 
         indexed_count += 1
 
