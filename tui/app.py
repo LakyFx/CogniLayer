@@ -91,9 +91,24 @@ class CogniLayerTUI(App):
 
 if __name__ == "__main__":
     project = None
+    demo_mode = "--demo" in sys.argv
+
     for i, arg in enumerate(sys.argv[1:], 1):
         if arg == "--project" and i < len(sys.argv) - 1:
             project = sys.argv[i + 1]
 
+    if demo_mode:
+        from tui.demo import create_demo_db
+        import tui.data as data_module
+        demo_path = create_demo_db()
+        data_module.DB_PATH = Path(demo_path)
+
     app = CogniLayerTUI(project=project)
     app.run()
+
+    # Cleanup demo DB
+    if demo_mode:
+        try:
+            Path(demo_path).unlink(missing_ok=True)
+        except Exception:
+            pass

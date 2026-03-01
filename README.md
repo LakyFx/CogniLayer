@@ -142,6 +142,7 @@ A visual memory browser right in your terminal. 7 tabs, keyboard navigation, wor
 ```bash
 cognilayer                    # All projects
 cognilayer --project my-app   # Specific project
+cognilayer --demo             # Demo mode with sample data (for screenshots)
 ```
 
 | Tab | What you see |
