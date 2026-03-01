@@ -6,6 +6,8 @@ Usage:
     python install.py --both    # Install for both
 """
 
+import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -15,6 +17,21 @@ from pathlib import Path
 COGNILAYER_HOME = Path.home() / ".cognilayer"
 CLAUDE_COMMANDS = Path.home() / ".claude" / "commands"
 REPO_DIR = Path(__file__).parent
+
+
+def _find_scripts_dir() -> Path | None:
+    """Find Python Scripts/bin directory that's likely in PATH."""
+    if platform.system() == "Windows":
+        # Python Scripts dir (usually in PATH on Windows)
+        scripts = Path(sys.executable).parent / "Scripts"
+        if scripts.exists():
+            return scripts
+    else:
+        # ~/.local/bin is standard on Linux/Mac
+        local_bin = Path.home() / ".local" / "bin"
+        local_bin.mkdir(parents=True, exist_ok=True)
+        return local_bin
+    return None
 
 
 def check_python_version():
@@ -60,6 +77,37 @@ def backup_database():
         backup_path = COGNILAYER_HOME / backup_name
         shutil.copy2(db_path, backup_path)
         print(f"  [ok] Database backed up: {backup_name}")
+
+
+def install_cli_wrapper():
+    """Install 'cognilayer' command so users can type it from anywhere."""
+    scripts_dir = _find_scripts_dir()
+    if not scripts_dir:
+        print("  [skip] Could not find Scripts directory for CLI wrapper")
+        return
+
+    if platform.system() == "Windows":
+        wrapper = scripts_dir / "cognilayer.bat"
+        wrapper.write_text(
+            '@echo off\n'
+            f'python "{COGNILAYER_HOME / "tui" / "app.py"}" %*\n',
+            encoding="utf-8",
+        )
+        print(f"  [ok] CLI wrapper installed: {wrapper}")
+    else:
+        wrapper = scripts_dir / "cognilayer"
+        wrapper.write_text(
+            '#!/usr/bin/env bash\n'
+            f'python3 "{COGNILAYER_HOME / "tui" / "app.py"}" "$@"\n',
+            encoding="utf-8",
+        )
+        wrapper.chmod(0o755)
+        print(f"  [ok] CLI wrapper installed: {wrapper}")
+
+        # Check if ~/.local/bin is in PATH
+        path_dirs = (os.environ.get("PATH") or "").split(":")
+        if str(scripts_dir) not in path_dirs:
+            print(f"  [!] Add to PATH: export PATH=\"{scripts_dir}:$PATH\"")
 
 
 def copy_files():
@@ -127,6 +175,9 @@ def copy_files():
     if helper_src.exists():
         shutil.copy2(helper_src, COGNILAYER_HOME / "onboard_helper.py")
         print("  [copy] onboard_helper.py")
+
+    # Install CLI wrapper (cognilayer command)
+    install_cli_wrapper()
 
     # Copy slash commands (locale-aware)
     config_dst = COGNILAYER_HOME / "config.yaml"
@@ -235,7 +286,7 @@ def main():
     print("  4. Run /status to verify everything works")
     print()
     print("  5. Launch TUI dashboard (requires textual):")
-    print("     python ~/.cognilayer/tui/app.py")
+    print("     cognilayer")
     print()
 
     # Optional: run test

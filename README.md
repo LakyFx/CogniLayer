@@ -140,8 +140,8 @@ Once installed, use these in Claude Code:
 A visual memory browser right in your terminal. 7 tabs, keyboard navigation, works on Windows, Mac, and Linux.
 
 ```bash
-python ~/.cognilayer/tui/app.py                    # All projects
-python ~/.cognilayer/tui/app.py --project my-app   # Specific project
+cognilayer                    # All projects
+cognilayer --project my-app   # Specific project
 ```
 
 | Tab | What you see |
