@@ -2,6 +2,8 @@
 
 **Persistent memory for Claude Code.** CogniLayer gives Claude Code a long-term memory that survives across sessions, projects, and crashes.
 
+**Save ~80-100K tokens per session** — instead of re-reading files and re-discovering architecture from scratch, CogniLayer injects compact context in a few kilobytes.
+
 Built as an [MCP server](https://modelcontextprotocol.io/) + hooks system that integrates directly into Claude Code's workflow.
 
 ## The Problem
