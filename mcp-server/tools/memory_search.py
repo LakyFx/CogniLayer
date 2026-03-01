@@ -1,6 +1,5 @@
 """memory_search — Hybrid search (FTS5 + vector) with staleness detection and heat decay."""
 
-import json
 import math
 import os
 from datetime import datetime, timedelta
@@ -9,14 +8,8 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from db import open_db
+from utils import get_active_session
 from search.fts_search import fts_search_facts
-
-
-def _get_active_session():
-    session_file = Path.home() / ".cognilayer" / "active_session.json"
-    if session_file.exists():
-        return json.loads(session_file.read_text(encoding="utf-8"))
-    return {}
 
 
 def _check_staleness(fact: dict, project_path: str) -> str | None:
@@ -95,7 +88,7 @@ def _apply_heat_decay(db, project: str):
 def memory_search(query: str, scope: str = "project",
                   type: str = None, limit: int = 5) -> str:
     """Search CogniLayer memory using hybrid FTS5 + vector search."""
-    session = _get_active_session()
+    session = get_active_session()
     project = session.get("project", "")
     project_path = session.get("project_path", "")
 

@@ -1,25 +1,18 @@
 """file_search — FTS5 search on indexed project file chunks."""
 
-import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from db import open_db
+from utils import get_active_session
 from search.fts_search import fts_search_chunks
-
-
-def _get_active_session():
-    session_file = Path.home() / ".cognilayer" / "active_session.json"
-    if session_file.exists():
-        return json.loads(session_file.read_text(encoding="utf-8"))
-    return {}
 
 
 def file_search(query: str, scope: str = "project",
                 file_filter: str = None, limit: int = 5) -> str:
     """Search indexed project files (PRD, docs, configs) via FTS5."""
-    session = _get_active_session()
+    session = get_active_session()
     project = session.get("project", "")
 
     if scope == "project":

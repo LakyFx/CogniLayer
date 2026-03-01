@@ -1,23 +1,16 @@
 """decision_log — Query decision log for current project."""
 
-import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from db import open_db
-
-
-def _get_active_session():
-    session_file = Path.home() / ".cognilayer" / "active_session.json"
-    if session_file.exists():
-        return json.loads(session_file.read_text(encoding="utf-8"))
-    return {}
+from utils import get_active_session
 
 
 def decision_log(query: str = None, project: str = None, limit: int = 5) -> str:
     """Query decision log entries."""
-    session = _get_active_session()
+    session = get_active_session()
     if not project:
         project = session.get("project", "")
 

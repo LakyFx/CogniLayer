@@ -1,6 +1,5 @@
 """identity_set — Set Project Identity Card fields."""
 
-import json
 import hashlib
 import sys
 from datetime import datetime
@@ -8,6 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from db import open_db
+from utils import get_active_session
 
 SAFETY_FIELDS = {
     "deploy_ssh_alias", "deploy_ssh_host", "deploy_ssh_port", "deploy_ssh_user",
@@ -31,13 +31,6 @@ TECH_FIELDS = {
 ALL_FIELDS = SAFETY_FIELDS | TECH_FIELDS
 
 
-def _get_active_session():
-    session_file = Path.home() / ".cognilayer" / "active_session.json"
-    if session_file.exists():
-        return json.loads(session_file.read_text(encoding="utf-8"))
-    return {}
-
-
 def _compute_safety_hash(identity: dict) -> str:
     values = []
     for field in sorted(SAFETY_FIELDS):
@@ -47,7 +40,7 @@ def _compute_safety_hash(identity: dict) -> str:
 
 def identity_set(fields: dict, lock_safety: bool = False) -> str:
     """Set Identity Card fields for current project."""
-    session = _get_active_session()
+    session = get_active_session()
     project = session.get("project", "")
     session_id = session.get("session_id", "")
 

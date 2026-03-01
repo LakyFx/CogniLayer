@@ -1,6 +1,5 @@
 """memory_write — Store facts into CogniLayer memory with vector embeddings."""
 
-import json
 import uuid
 import os
 from datetime import datetime
@@ -9,13 +8,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from db import open_db, ensure_vec
-
-
-def _get_active_session():
-    session_file = Path.home() / ".cognilayer" / "active_session.json"
-    if session_file.exists():
-        return json.loads(session_file.read_text(encoding="utf-8"))
-    return {}
+from utils import get_active_session
 
 
 def _embed_fact(db, rowid: int, content: str, tags: str = None, domain: str = None):
@@ -42,7 +35,7 @@ def _embed_fact(db, rowid: int, content: str, tags: str = None, domain: str = No
 def memory_write(content: str, type: str = "fact", tags: str = None,
                  domain: str = None, source_file: str = None) -> str:
     """Write a fact to CogniLayer memory with deduplication."""
-    session = _get_active_session()
+    session = get_active_session()
     project = session.get("project", "unknown")
     session_id = session.get("session_id", None)
     project_path = session.get("project_path", "")

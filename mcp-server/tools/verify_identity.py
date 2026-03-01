@@ -1,19 +1,12 @@
 """verify_identity — Safety gate before deploy/SSH/push operations."""
 
-import json
 import hashlib
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from db import open_db
-
-
-def _get_active_session():
-    session_file = Path.home() / ".cognilayer" / "active_session.json"
-    if session_file.exists():
-        return json.loads(session_file.read_text(encoding="utf-8"))
-    return {}
+from utils import get_active_session
 
 
 # Required fields per action type
@@ -51,7 +44,7 @@ def _compute_safety_hash(identity: dict) -> str:
 
 def verify_identity(action_type: str) -> str:
     """Verify project identity before sensitive operations."""
-    session = _get_active_session()
+    session = get_active_session()
     project = session.get("project", "")
 
     if not project:

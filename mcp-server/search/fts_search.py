@@ -1,34 +1,65 @@
 """Search helpers for CogniLayer — FTS5 + vector hybrid search (Phase 2)."""
 
 import sqlite3
+
+import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from db import ensure_vec
 
 
-def _ensure_vec(db: sqlite3.Connection) -> bool:
-    """Ensure sqlite-vec is loaded. Returns True if available."""
-    try:
-        db.execute("SELECT vec_version()")
-        return True
-    except Exception:
-        # Try loading it
-        try:
-            import sqlite_vec
-            db.enable_load_extension(True)
-            sqlite_vec.load(db)
-            db.enable_load_extension(False)
-            return True
-        except Exception:
-            return False
+# --- Helpers ---
 
-
-def _vec_available(db: sqlite3.Connection) -> bool:
-    """Check if sqlite-vec is loaded and vector tables exist."""
+def _vec_tables_exist(db: sqlite3.Connection) -> bool:
+    """Check if vector tables exist in the database."""
     try:
         db.execute("SELECT COUNT(*) FROM facts_vec")
         return True
     except Exception:
         return False
 
+
+def _is_trivial_query(query: str) -> bool:
+    """Check if query is too short/generic to benefit from vector search."""
+    stripped = query.strip().strip('"').strip("'").strip("*")
+    return len(stripped) < 3
+
+
+def _escape_fts5(query: str) -> str:
+    """Escape a query string for safe FTS5 MATCH use.
+
+    Wraps in double quotes to treat as phrase (disables OR/AND/NOT/NEAR operators).
+    """
+    escaped = query.replace('"', '""')
+    return f'"{escaped}"'
+
+
+def _fact_row_to_dict(row) -> dict:
+    """Convert a facts row to dict using column names."""
+    return {
+        "id": row["id"], "project": row["project"], "content": row["content"],
+        "type": row["type"], "domain": row["domain"], "tags": row["tags"],
+        "timestamp": row["timestamp"], "heat_score": row["heat_score"],
+        "source_file": row["source_file"], "source_mtime": row["source_mtime"],
+        "session_id": row["session_id"], "rowid": row["rowid"],
+    }
+
+
+def _chunk_row_to_dict(row) -> dict:
+    """Convert a file_chunks row to dict using column names.
+
+    Note: file_chunks.id IS the rowid (INTEGER PRIMARY KEY AUTOINCREMENT),
+    so we alias it as row_id in SELECT to avoid duplicate column names.
+    """
+    return {
+        "id": row["id"], "project": row["project"], "file_path": row["file_path"],
+        "section_title": row["section_title"], "chunk_index": row["chunk_index"],
+        "content": row["content"], "file_mtime": row["file_mtime"],
+        "rowid": row["row_id"],
+    }
+
+
+# --- Vector search ---
 
 def _vec_search_facts(db: sqlite3.Connection, query_embedding: bytes,
                       project: str = None, fact_type: str = None,
@@ -40,18 +71,17 @@ def _vec_search_facts(db: sqlite3.Connection, query_embedding: bytes,
         WHERE embedding MATCH ? AND k = ?
     """, (query_embedding, limit * 3)).fetchall()
 
-    # Filter by project/type using facts table
     results = {}
     for row in rows:
         rowid, distance = row[0], row[1]
         fact = db.execute("SELECT project, type FROM facts WHERE rowid = ?", (rowid,)).fetchone()
         if not fact:
             continue
-        if scope == "project" and project and fact[0] != project:
+        if scope == "project" and project and fact["project"] != project:
             continue
-        if scope != "all" and scope != "project" and fact[0] != scope:
+        if scope != "all" and scope != "project" and fact["project"] != scope:
             continue
-        if fact_type and fact[1] != fact_type:
+        if fact_type and fact["type"] != fact_type:
             continue
         results[rowid] = distance
 
@@ -76,16 +106,18 @@ def _vec_search_chunks(db: sqlite3.Connection, query_embedding: bytes,
         ).fetchone()
         if not chunk:
             continue
-        if project and chunk[0] != project:
+        if project and chunk["project"] != project:
             continue
         if file_filter:
             pattern = file_filter.replace("*", "")
-            if pattern not in chunk[1]:
+            if pattern not in chunk["file_path"]:
                 continue
         results[rowid] = distance
 
     return results
 
+
+# --- Hybrid ranking ---
 
 def _hybrid_rank(fts_results: list[dict], vec_distances: dict[int, float],
                  fts_weight: float = 0.4, vec_weight: float = 0.6) -> list[dict]:
@@ -93,58 +125,38 @@ def _hybrid_rank(fts_results: list[dict], vec_distances: dict[int, float],
 
     FTS5 rank: position-based (1st result = 1.0, last = 0.0)
     Vector distance: converted to similarity (lower distance = higher score)
+
+    Note: vec-only results must be pre-fetched and added to fts_results
+    before calling this function.
     """
-    all_rowids = set()
     fts_scores = {}
     vec_scores = {}
 
     # FTS5 scores: position-based
     for i, result in enumerate(fts_results):
         rowid = result["rowid"]
-        all_rowids.add(rowid)
         fts_scores[rowid] = 1.0 - (i / max(len(fts_results), 1))
 
     # Vector scores: distance -> similarity (0-1)
     if vec_distances:
         max_dist = max(vec_distances.values()) if vec_distances else 1.0
         for rowid, distance in vec_distances.items():
-            all_rowids.add(rowid)
             vec_scores[rowid] = 1.0 - (distance / max(max_dist * 1.2, 0.001))
 
-    # Build result lookup from FTS results
-    result_lookup = {r["rowid"]: r for r in fts_results}
-
-    # Combine scores
-    scored = []
-    for rowid in all_rowids:
+    # Score all results (both FTS and vec-only are already in fts_results)
+    for result in fts_results:
+        rowid = result["rowid"]
         fts_s = fts_scores.get(rowid, 0.0)
         vec_s = vec_scores.get(rowid, 0.0)
-        combined = (fts_weight * fts_s) + (vec_weight * vec_s)
+        result["_hybrid_score"] = (fts_weight * fts_s) + (vec_weight * vec_s)
 
-        if rowid in result_lookup:
-            result = result_lookup[rowid]
-            result["_hybrid_score"] = combined
-            scored.append(result)
-
-    scored.sort(key=lambda x: x["_hybrid_score"], reverse=True)
-    return scored
+    fts_results.sort(key=lambda x: x["_hybrid_score"], reverse=True)
+    return fts_results
 
 
-def _is_trivial_query(query: str) -> bool:
-    """Check if query is too short/generic to benefit from vector search."""
-    stripped = query.strip().strip('"').strip("'").strip("*")
-    return len(stripped) < 3
+# --- Facts search ---
 
-
-def _row_to_dict(row) -> dict:
-    """Convert a facts row to dict."""
-    return {
-        "id": row[0], "project": row[1], "content": row[2],
-        "type": row[3], "domain": row[4], "tags": row[5],
-        "timestamp": row[6], "heat_score": row[7],
-        "source_file": row[8], "source_mtime": row[9],
-        "session_id": row[10], "rowid": row[11],
-    }
+_FACTS_COLUMNS = "id, project, content, type, domain, tags, timestamp, heat_score, source_file, source_mtime, session_id, rowid"
 
 
 def fts_search_facts(db: sqlite3.Connection, query: str, project: str = None,
@@ -165,35 +177,28 @@ def fts_search_facts(db: sqlite3.Connection, query: str, project: str = None,
         conditions.append("type = ?")
         params.append(fact_type)
 
-    # Wildcard query — return hottest/newest facts without FTS5
+    # Wildcard/trivial query — return hottest/newest facts without FTS5
     if _is_trivial_query(query):
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         sql = f"""
-            SELECT id, project, content, type, domain, tags,
-                   timestamp, heat_score, source_file, source_mtime,
-                   session_id, rowid
+            SELECT {_FACTS_COLUMNS}
             FROM facts
             {where}
             ORDER BY heat_score DESC, timestamp DESC
             LIMIT ?
         """
         rows = db.execute(sql, params + [limit]).fetchall()
-        return [_row_to_dict(row) for row in rows]
+        return [_fact_row_to_dict(row) for row in rows]
 
-    # Build FTS5 query — escape special chars
-    fts_query = query.replace('"', '""')
+    # FTS5 search
+    fts_query = _escape_fts5(query)
     fts_where = f"AND {' AND '.join(['f.' + c for c in conditions])}" if conditions else ""
 
-    # Skip vector search for trivial queries (*, short strings)
-    # — avoids 30-60s fastembed cold start for wildcard /status queries
-    use_vec = not _is_trivial_query(query)
-    vec_ready = use_vec and _ensure_vec(db) and _vec_available(db)
+    vec_ready = ensure_vec(db) and _vec_tables_exist(db)
     fetch_limit = limit * 3 if vec_ready else limit
 
     sql = f"""
-        SELECT f.id, f.project, f.content, f.type, f.domain, f.tags,
-               f.timestamp, f.heat_score, f.source_file, f.source_mtime,
-               f.session_id, f.rowid
+        SELECT f.{_FACTS_COLUMNS.replace(', ', ', f.')}
         FROM facts f
         JOIN facts_fts fts ON f.rowid = fts.rowid
         WHERE facts_fts MATCH ? {fts_where}
@@ -206,25 +211,19 @@ def fts_search_facts(db: sqlite3.Connection, query: str, project: str = None,
         rows = db.execute(sql, fts_params).fetchall()
     except sqlite3.OperationalError:
         # Fallback: LIKE search if FTS5 query syntax fails
-        like_pattern = f"%{query}%"
-        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-        if where:
-            where += " AND content LIKE ?"
-        else:
-            where = "WHERE content LIKE ?"
+        where_parts = list(conditions) + ["content LIKE ?"]
+        where = "WHERE " + " AND ".join(where_parts)
         sql = f"""
-            SELECT id, project, content, type, domain, tags,
-                   timestamp, heat_score, source_file, source_mtime,
-                   session_id, rowid
+            SELECT {_FACTS_COLUMNS}
             FROM facts
             {where}
             ORDER BY heat_score DESC
             LIMIT ?
         """
-        fts_params = params + [like_pattern] + [fetch_limit]
+        fts_params = params + [f"%{query}%"] + [fetch_limit]
         rows = db.execute(sql, fts_params).fetchall()
 
-    fts_results = [_row_to_dict(row) for row in rows]
+    fts_results = [_fact_row_to_dict(row) for row in rows]
 
     # Hybrid search: combine with vector results if available
     if vec_ready:
@@ -233,6 +232,15 @@ def fts_search_facts(db: sqlite3.Connection, query: str, project: str = None,
             query_embedding = embed_text(query)
             vec_distances = _vec_search_facts(db, query_embedding, project, fact_type, scope, limit)
             if vec_distances:
+                # Fetch vec-only results not already in FTS results
+                fts_rowids = {r["rowid"] for r in fts_results}
+                for rowid in vec_distances:
+                    if rowid not in fts_rowids:
+                        row = db.execute(f"""
+                            SELECT {_FACTS_COLUMNS} FROM facts WHERE rowid = ?
+                        """, (rowid,)).fetchone()
+                        if row:
+                            fts_results.append(_fact_row_to_dict(row))
                 fts_results = _hybrid_rank(fts_results, vec_distances)
         except Exception:
             pass  # Vector search failed, use FTS5 only
@@ -240,34 +248,50 @@ def fts_search_facts(db: sqlite3.Connection, query: str, project: str = None,
     return fts_results[:limit]
 
 
+# --- Chunks search ---
+
+_CHUNKS_COLUMNS = "id, project, file_path, section_title, chunk_index, content, file_mtime, id AS row_id"
+
+
 def fts_search_chunks(db: sqlite3.Connection, query: str, project: str = None,
                       file_filter: str = None, limit: int = 5) -> list[dict]:
     """Search file chunks using FTS5 + optional vector hybrid search."""
-    fts_query = query.replace('"', '""')
-
     conditions = []
     params = []
 
     if project:
-        conditions.append("fc.project = ?")
+        conditions.append("project = ?")
         params.append(project)
 
     if file_filter:
-        conditions.append("fc.file_path LIKE ?")
+        conditions.append("file_path LIKE ?")
         params.append(f"%{file_filter.replace('*', '%')}%")
 
-    where = f"AND {' AND '.join(conditions)}" if conditions else ""
+    # Trivial query — return recent chunks
+    if _is_trivial_query(query):
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        sql = f"""
+            SELECT {_CHUNKS_COLUMNS}
+            FROM file_chunks
+            {where}
+            ORDER BY id DESC
+            LIMIT ?
+        """
+        rows = db.execute(sql, params + [limit]).fetchall()
+        return [_chunk_row_to_dict(row) for row in rows]
 
-    use_vec = not _is_trivial_query(query)
-    vec_ready = use_vec and _ensure_vec(db) and _vec_available(db)
+    # FTS5 search
+    fts_query = _escape_fts5(query)
+    fts_where = f"AND {' AND '.join(['fc.' + c for c in conditions])}" if conditions else ""
+
+    vec_ready = ensure_vec(db) and _vec_tables_exist(db)
     fetch_limit = limit * 3 if vec_ready else limit
 
     sql = f"""
-        SELECT fc.id, fc.project, fc.file_path, fc.section_title,
-               fc.chunk_index, fc.content, fc.file_mtime, fc.rowid
+        SELECT fc.{_CHUNKS_COLUMNS.replace(', ', ', fc.')}
         FROM file_chunks fc
         JOIN chunks_fts cfts ON fc.rowid = cfts.rowid
-        WHERE chunks_fts MATCH ? {where}
+        WHERE chunks_fts MATCH ? {fts_where}
         ORDER BY rank
         LIMIT ?
     """
@@ -276,25 +300,20 @@ def fts_search_chunks(db: sqlite3.Connection, query: str, project: str = None,
     try:
         rows = db.execute(sql, fts_params).fetchall()
     except sqlite3.OperationalError:
-        like_pattern = f"%{query}%"
+        # Fallback: LIKE search
+        where_parts = list(conditions) + ["content LIKE ?"]
+        where = "WHERE " + " AND ".join(where_parts)
         sql = f"""
-            SELECT id, project, file_path, section_title,
-                   chunk_index, content, file_mtime, rowid
+            SELECT {_CHUNKS_COLUMNS}
             FROM file_chunks
-            WHERE content LIKE ? {where.replace('fc.', '')}
-            ORDER BY id
+            {where}
+            ORDER BY id DESC
             LIMIT ?
         """
-        fts_params = [like_pattern] + ([p for p in params]) + [fetch_limit]
+        fts_params = params + [f"%{query}%"] + [fetch_limit]
         rows = db.execute(sql, fts_params).fetchall()
 
-    fts_results = []
-    for row in rows:
-        fts_results.append({
-            "id": row[0], "project": row[1], "file_path": row[2],
-            "section_title": row[3], "chunk_index": row[4],
-            "content": row[5], "file_mtime": row[6], "rowid": row[7],
-        })
+    fts_results = [_chunk_row_to_dict(row) for row in rows]
 
     # Hybrid search
     if vec_ready:
@@ -303,6 +322,15 @@ def fts_search_chunks(db: sqlite3.Connection, query: str, project: str = None,
             query_embedding = embed_text(query)
             vec_distances = _vec_search_chunks(db, query_embedding, project, file_filter, limit)
             if vec_distances:
+                # Fetch vec-only results
+                fts_rowids = {r["rowid"] for r in fts_results}
+                for rowid in vec_distances:
+                    if rowid not in fts_rowids:
+                        row = db.execute(f"""
+                            SELECT {_CHUNKS_COLUMNS} FROM file_chunks WHERE rowid = ?
+                        """, (rowid,)).fetchone()
+                        if row:
+                            fts_results.append(_chunk_row_to_dict(row))
                 fts_results = _hybrid_rank(fts_results, vec_distances)
         except Exception:
             pass
