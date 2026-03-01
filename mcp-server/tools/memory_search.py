@@ -33,6 +33,9 @@ def _heat_label(score: float) -> str:
     return "cold"
 
 
+_last_decay_time = None
+
+
 def _apply_heat_decay(db, project: str):
     """Apply time-based heat decay to all facts in the project.
 
@@ -43,7 +46,11 @@ def _apply_heat_decay(db, project: str):
     - Facts accessed 30+ days ago: decay 0.70
     - Minimum heat: 0.05 (never fully forgotten)
     """
+    global _last_decay_time
     now = datetime.now()
+    if _last_decay_time and (now - _last_decay_time).total_seconds() < 3600:
+        return  # Skip if last decay was less than 1 hour ago
+    _last_decay_time = now
     thresholds = [
         (timedelta(days=1), 1.0),     # <24h: no decay
         (timedelta(days=7), 0.95),    # 1-7 days

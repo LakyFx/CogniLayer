@@ -1,6 +1,7 @@
 """Register CogniLayer in Claude Code settings.json."""
 
 import json
+import sys
 from pathlib import Path
 
 CLAUDE_SETTINGS = Path.home() / ".claude" / "settings.json"
@@ -22,8 +23,10 @@ def register():
     if "mcpServers" not in settings:
         settings["mcpServers"] = {}
 
+    python_cmd = sys.executable.replace("\\", "/")
+
     settings["mcpServers"]["cognilayer"] = {
-        "command": "python",
+        "command": python_cmd,
         "args": [server_path]
     }
 
@@ -31,9 +34,9 @@ def register():
     if "hooks" not in settings:
         settings["hooks"] = {}
 
-    hook_start = f"python {home_str}/hooks/on_session_start.py"
-    hook_end = f"python {home_str}/hooks/on_session_end.py"
-    hook_change = f"python {home_str}/hooks/on_file_change.py"
+    hook_start = f'"{python_cmd}" "{home_str}/hooks/on_session_start.py"'
+    hook_end = f'"{python_cmd}" "{home_str}/hooks/on_session_end.py"'
+    hook_change = f'"{python_cmd}" "{home_str}/hooks/on_file_change.py"'
 
     cognilayer_hooks = {
         "SessionStart": {

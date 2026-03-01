@@ -99,6 +99,11 @@ def build_emergency_bridge(db, session_id: str) -> str:
 
 
 def check_crash_recovery(db, project: str) -> str | None:
+    from datetime import timedelta
+    # Only treat sessions as crashed if they started more than 60 seconds ago.
+    # This avoids false positives from a concurrent session that is still running
+    # (e.g. two Claude Code windows on the same project).
+    cutoff = (datetime.now() - timedelta(seconds=60)).isoformat()
     orphan = db.execute("""
         SELECT s.id, s.start_time, s.bridge_content,
                (SELECT COUNT(*) FROM changes WHERE session_id = s.id) as change_count,
@@ -107,9 +112,9 @@ def check_crash_recovery(db, project: str) -> str | None:
                       WHERE session_id = s.id
                       ORDER BY timestamp DESC LIMIT 5)) as last_files
         FROM sessions s
-        WHERE project = ? AND end_time IS NULL
+        WHERE project = ? AND end_time IS NULL AND start_time < ?
         ORDER BY start_time DESC LIMIT 1
-    """, (project,)).fetchone()
+    """, (project, cutoff)).fetchone()
     if orphan:
         session_id, start_time, bridge_content, changes, last_files = (
             orphan[0], orphan[1], orphan[2], orphan[3], orphan[4]
@@ -358,7 +363,7 @@ def inject_cognilayer_block(claude_md_path: Path, dna: str, bridge: str | None, 
     else:
         new_content = block + "\n"
 
-    claude_md_path.write_text(new_content, encoding="utf-8")
+    claude_md_path.write_text(new_content, encoding="utf-8", newline="\n")
 
 
 def main():

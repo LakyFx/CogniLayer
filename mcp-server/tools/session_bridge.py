@@ -39,9 +39,11 @@ def session_bridge(action: str, content: str = None) -> str:
 
         db = open_db()
         try:
-            db.execute("""
+            cursor = db.execute("""
                 UPDATE sessions SET bridge_content = ? WHERE id = ?
             """, (content, session_id))
+            if cursor.rowcount == 0:
+                return "Warning: Session not found in DB. Bridge not saved."
             db.commit()
         finally:
             db.close()

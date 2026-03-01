@@ -86,11 +86,25 @@ def reindex_project(db, project: str, project_path: Path,
         if not chunks:
             continue
 
+        # Get old rowids before deleting (for chunks_vec cleanup)
+        old_rowids = [r[0] for r in db.execute(
+            "SELECT rowid FROM file_chunks WHERE project = ? AND file_path = ?",
+            (project, rel_path)
+        ).fetchall()]
+
         # Delete old chunks for this file
         db.execute(
             "DELETE FROM file_chunks WHERE project = ? AND file_path = ?",
             (project, rel_path)
         )
+
+        # Clean orphaned chunks_vec entries
+        if old_rowids and ensure_vec(db):
+            for rid in old_rowids:
+                try:
+                    db.execute("DELETE FROM chunks_vec WHERE rowid = ?", (rid,))
+                except Exception:
+                    pass
 
         # Insert new chunks + embeddings
         new_rowids = []
@@ -133,9 +147,23 @@ def reindex_project(db, project: str, project_path: Path,
     }
     for indexed_path in list(indexed.keys()):
         if indexed_path not in current_files:
+            # Get rowids before deleting (for chunks_vec cleanup)
+            orphan_rowids = [r[0] for r in db.execute(
+                "SELECT rowid FROM file_chunks WHERE project = ? AND file_path = ?",
+                (project, indexed_path)
+            ).fetchall()]
+
             db.execute(
                 "DELETE FROM file_chunks WHERE project = ? AND file_path = ?",
                 (project, indexed_path)
             )
+
+            # Clean orphaned chunks_vec entries
+            if orphan_rowids and ensure_vec(db):
+                for rid in orphan_rowids:
+                    try:
+                        db.execute("DELETE FROM chunks_vec WHERE rowid = ?", (rid,))
+                    except Exception:
+                        pass
 
     return indexed_count

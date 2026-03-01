@@ -49,30 +49,6 @@ CREATE TABLE IF NOT EXISTS facts (
     FOREIGN KEY (project) REFERENCES projects(name)
 );
 
--- FTS5 fulltext index on facts
-CREATE VIRTUAL TABLE IF NOT EXISTS facts_fts USING fts5(
-    content, tags, domain,
-    content=facts, content_rowid=rowid
-);
-
--- Triggers to keep FTS5 in sync with facts table
-CREATE TRIGGER IF NOT EXISTS facts_ai AFTER INSERT ON facts BEGIN
-    INSERT INTO facts_fts(rowid, content, tags, domain)
-    VALUES (new.rowid, new.content, new.tags, new.domain);
-END;
-
-CREATE TRIGGER IF NOT EXISTS facts_ad AFTER DELETE ON facts BEGIN
-    INSERT INTO facts_fts(facts_fts, rowid, content, tags, domain)
-    VALUES ('delete', old.rowid, old.content, old.tags, old.domain);
-END;
-
-CREATE TRIGGER IF NOT EXISTS facts_au AFTER UPDATE ON facts BEGIN
-    INSERT INTO facts_fts(facts_fts, rowid, content, tags, domain)
-    VALUES ('delete', old.rowid, old.content, old.tags, old.domain);
-    INSERT INTO facts_fts(rowid, content, tags, domain)
-    VALUES (new.rowid, new.content, new.tags, new.domain);
-END;
-
 -- Indexed project files (chunks)
 CREATE TABLE IF NOT EXISTS file_chunks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,30 +61,6 @@ CREATE TABLE IF NOT EXISTS file_chunks (
     embedding BLOB,
     FOREIGN KEY (project) REFERENCES projects(name)
 );
-
--- FTS5 fulltext index on file_chunks
-CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
-    content, section_title, file_path,
-    content=file_chunks, content_rowid=rowid
-);
-
--- Triggers to keep chunks_fts in sync
-CREATE TRIGGER IF NOT EXISTS chunks_ai AFTER INSERT ON file_chunks BEGIN
-    INSERT INTO chunks_fts(rowid, content, section_title, file_path)
-    VALUES (new.rowid, new.content, new.section_title, new.file_path);
-END;
-
-CREATE TRIGGER IF NOT EXISTS chunks_ad AFTER DELETE ON file_chunks BEGIN
-    INSERT INTO chunks_fts(chunks_fts, rowid, content, section_title, file_path)
-    VALUES ('delete', old.rowid, old.content, old.section_title, old.file_path);
-END;
-
-CREATE TRIGGER IF NOT EXISTS chunks_au AFTER UPDATE ON file_chunks BEGIN
-    INSERT INTO chunks_fts(chunks_fts, rowid, content, section_title, file_path)
-    VALUES ('delete', old.rowid, old.content, old.section_title, old.file_path);
-    INSERT INTO chunks_fts(rowid, content, section_title, file_path)
-    VALUES (new.rowid, new.content, new.section_title, new.file_path);
-END;
 
 -- Decision log (append-only)
 CREATE TABLE IF NOT EXISTS decisions (
@@ -237,6 +189,57 @@ CREATE INDEX IF NOT EXISTS idx_identity_domain ON project_identity(domain_primar
 CREATE INDEX IF NOT EXISTS idx_audit_project ON identity_audit_log(project, timestamp DESC);
 """
 
+# FTS5 virtual tables and sync triggers (separated for graceful fallback)
+FTS_SCHEMA = """
+-- FTS5 fulltext index on facts
+CREATE VIRTUAL TABLE IF NOT EXISTS facts_fts USING fts5(
+    content, tags, domain,
+    content=facts, content_rowid=rowid
+);
+
+-- Triggers to keep FTS5 in sync with facts table
+CREATE TRIGGER IF NOT EXISTS facts_ai AFTER INSERT ON facts BEGIN
+    INSERT INTO facts_fts(rowid, content, tags, domain)
+    VALUES (new.rowid, new.content, new.tags, new.domain);
+END;
+
+CREATE TRIGGER IF NOT EXISTS facts_ad AFTER DELETE ON facts BEGIN
+    INSERT INTO facts_fts(facts_fts, rowid, content, tags, domain)
+    VALUES ('delete', old.rowid, old.content, old.tags, old.domain);
+END;
+
+CREATE TRIGGER IF NOT EXISTS facts_au AFTER UPDATE ON facts BEGIN
+    INSERT INTO facts_fts(facts_fts, rowid, content, tags, domain)
+    VALUES ('delete', old.rowid, old.content, old.tags, old.domain);
+    INSERT INTO facts_fts(rowid, content, tags, domain)
+    VALUES (new.rowid, new.content, new.tags, new.domain);
+END;
+
+-- FTS5 fulltext index on file_chunks
+CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
+    content, section_title, file_path,
+    content=file_chunks, content_rowid=rowid
+);
+
+-- Triggers to keep chunks_fts in sync
+CREATE TRIGGER IF NOT EXISTS chunks_ai AFTER INSERT ON file_chunks BEGIN
+    INSERT INTO chunks_fts(rowid, content, section_title, file_path)
+    VALUES (new.rowid, new.content, new.section_title, new.file_path);
+END;
+
+CREATE TRIGGER IF NOT EXISTS chunks_ad AFTER DELETE ON file_chunks BEGIN
+    INSERT INTO chunks_fts(chunks_fts, rowid, content, section_title, file_path)
+    VALUES ('delete', old.rowid, old.content, old.section_title, old.file_path);
+END;
+
+CREATE TRIGGER IF NOT EXISTS chunks_au AFTER UPDATE ON file_chunks BEGIN
+    INSERT INTO chunks_fts(chunks_fts, rowid, content, section_title, file_path)
+    VALUES ('delete', old.rowid, old.content, old.section_title, old.file_path);
+    INSERT INTO chunks_fts(rowid, content, section_title, file_path)
+    VALUES (new.rowid, new.content, new.section_title, new.file_path);
+END;
+"""
+
 # Phase 2: Vector tables (require sqlite-vec extension)
 VEC_SCHEMA = """
 CREATE VIRTUAL TABLE IF NOT EXISTS facts_vec USING vec0(
@@ -249,6 +252,16 @@ CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vec USING vec0(
 """
 
 
+def rebuild_fts(db):
+    """Rebuild FTS5 indexes from source tables."""
+    try:
+        db.execute("INSERT INTO facts_fts(facts_fts) VALUES('rebuild')")
+        db.execute("INSERT INTO chunks_fts(chunks_fts) VALUES('rebuild')")
+        db.commit()
+    except Exception as e:
+        print(f"FTS rebuild failed: {e}", file=sys.stderr)
+
+
 def init_db():
     """Create all tables and indexes."""
     db_path = get_db_path()
@@ -257,6 +270,14 @@ def init_db():
     db = open_db(with_vec=True)
     db.executescript(SCHEMA)
     db.commit()
+
+    # Create FTS5 virtual tables and triggers (graceful if FTS5 unavailable)
+    try:
+        db.executescript(FTS_SCHEMA)
+        db.commit()
+    except Exception as e:
+        print(f"FTS5 not available, fulltext search disabled: {e}",
+              file=sys.stderr)
 
     # Phase 2: Create vector tables if sqlite-vec is available
     try:
