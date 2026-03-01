@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Auto-deploy CogniLayer files to ~/.cognilayer/ after each commit.
+# Only copies files that actually changed in the commit.
+
+COGNILAYER_HOME="$HOME/.cognilayer"
+REPO_DIR="$(git rev-parse --show-toplevel)"
+
+# Skip if running from ~/.cognilayer/ itself
+if [ "$(realpath "$REPO_DIR")" = "$(realpath "$COGNILAYER_HOME")" ]; then
+    exit 0
+fi
+
+# Get list of changed files in this commit
+changed_files=$(git diff-tree --no-commit-id --name-only -r HEAD)
+
+deployed=0
+
+while IFS= read -r file; do
+    case "$file" in
+        mcp-server/*)
+            src="$REPO_DIR/$file"
+            dst="$COGNILAYER_HOME/$file"
+            if [ -f "$src" ]; then
+                mkdir -p "$(dirname "$dst")"
+                cp "$src" "$dst"
+                deployed=$((deployed + 1))
+            fi
+            ;;
+        hooks/*.py)
+            src="$REPO_DIR/$file"
+            dst="$COGNILAYER_HOME/$file"
+            if [ -f "$src" ]; then
+                mkdir -p "$(dirname "$dst")"
+                cp "$src" "$dst"
+                deployed=$((deployed + 1))
+            fi
+            ;;
+        tui/*.py|tui/*.tcss|tui/**/*.py)
+            src="$REPO_DIR/$file"
+            dst="$COGNILAYER_HOME/$file"
+            if [ -f "$src" ]; then
+                mkdir -p "$(dirname "$dst")"
+                cp "$src" "$dst"
+                deployed=$((deployed + 1))
+            fi
+            ;;
+        commands/*/*.md)
+            src="$REPO_DIR/$file"
+            # commands/cs/foo.md -> ~/.claude/commands/foo.md
+            fname="$(basename "$file")"
+            dst="$HOME/.claude/commands/$fname"
+            if [ -f "$src" ]; then
+                cp "$src" "$dst"
+                deployed=$((deployed + 1))
+            fi
+            ;;
+        VERSION)
+            cp "$REPO_DIR/VERSION" "$COGNILAYER_HOME/VERSION"
+            deployed=$((deployed + 1))
+            ;;
+    esac
+done <<< "$changed_files"
+
+if [ "$deployed" -gt 0 ]; then
+    echo "[CogniLayer] Auto-deployed $deployed file(s) to ~/.cognilayer/"
+fi

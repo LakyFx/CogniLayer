@@ -83,6 +83,29 @@ def backup_database():
         print(f"  [ok] Database backed up: {backup_name}")
 
 
+def install_git_hook():
+    """Install post-commit hook for auto-deploy to ~/.cognilayer/."""
+    git_dir = REPO_DIR / ".git"
+    if not git_dir.exists():
+        print("  [skip] Not a git repo — skipping hook")
+        return
+    hook_src = REPO_DIR / "hooks" / "git-post-commit"
+    hook_dst = git_dir / "hooks" / "post-commit"
+    if not hook_src.exists():
+        print("  [skip] hooks/git-post-commit not found in repo")
+        return
+    if hook_dst.exists():
+        # Check if it's already our hook
+        if hook_dst.read_text(encoding="utf-8").strip() == hook_src.read_text(encoding="utf-8").strip():
+            print("  [ok] post-commit hook already installed")
+            return
+        print("  [skip] post-commit hook exists (custom) — not overwriting")
+        return
+    shutil.copy2(hook_src, hook_dst)
+    hook_dst.chmod(0o755)
+    print("  [ok] post-commit hook installed (auto-deploy on commit)")
+
+
 def install_cli_wrapper():
     """Install 'cognilayer' command so users can type it from anywhere."""
     scripts_dir = _find_scripts_dir()
@@ -205,6 +228,9 @@ def copy_files():
 
     # Install CLI wrapper (cognilayer command)
     install_cli_wrapper()
+
+    # Install git post-commit hook (auto-deploy on commit)
+    install_git_hook()
 
     # Copy slash commands (locale-aware)
     config_dst = COGNILAYER_HOME / "config.yaml"
