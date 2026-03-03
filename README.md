@@ -10,9 +10,11 @@ With CogniLayer, it already knows. Three things your agent doesn't have today:
 
 🔍 **Code intelligence** — who calls what, what depends on what, what breaks if you rename a function. Tree-sitter AST parsing across 10+ languages, not grep
 
-⚡ **80-100K tokens saved per session** — 3 semantic queries replace 15 file reads. Your agent works faster because it already knows your codebase
+🤖 **Subagent context compression** — research subagents write findings to DB instead of dumping 40K+ tokens into parent context. Parent gets a 500-token summary + on-demand `memory_search` retrieval
 
-[![Version](https://img.shields.io/badge/version-4.1.0-orange.svg)](#)
+⚡ **80-200K+ tokens saved per session** — semantic search replaces file reads, subagent findings go to DB instead of context. Longer sessions with subagents save more
+
+[![Version](https://img.shields.io/badge/version-4.2.0-orange.svg)](#)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-green.svg)](https://www.python.org/)
 [![MCP Server](https://img.shields.io/badge/MCP-17%20tools-purple.svg)](https://modelcontextprotocol.io/)
@@ -134,6 +136,32 @@ memory_search("stripe sdk upgrade")
 
 Zero re-explanation. Claude picks up exactly where it left off, **including the blocker you hadn't mentioned yet**.
 
+### Subagent research: "What MCP frameworks exist?"
+
+Without CogniLayer, the subagent returns a 40K-token dump into parent context:
+
+```
+Parent (200K context):
+  → spawn subagent: "Research community MCP servers"
+  ← subagent returns: 40K tokens about 15 projects
+  → all 40K crammed into parent context
+  → remaining: 160K → next subagent → 120K → next → 80K...
+```
+
+With CogniLayer's Subagent Memory Protocol:
+
+```
+Parent (200K context):
+  → spawn subagent: "Research MCP servers, save to memory"
+  ← subagent writes details to DB, returns: "Saved 3 facts,
+     search 'MCP server ecosystem'. Summary: Python dominates,
+     FastMCP most popular, 3 architectural patterns."
+  → parent context: ~500 tokens
+  → need details? memory_search("MCP server ecosystem") → targeted pull
+```
+
+40K tokens compressed to 500. The findings persist in DB across sessions — not just for this conversation, but forever.
+
 ---
 
 ## Killer Features
@@ -143,7 +171,8 @@ Zero re-explanation. Claude picks up exactly where it left off, **including the 
 | **Code Intelligence** | `code_context` shows who calls what. `code_impact` maps blast radius before you touch anything. Powered by tree-sitter AST parsing |
 | **Semantic Search** | Hybrid FTS5 + vector search finds the right fact even with different wording. Sub-millisecond response |
 | **17 MCP Tools** | Memory, code analysis, safety, project context — Claude uses them automatically, no commands needed |
-| **Token Savings** | 3 targeted queries (~800 tokens) replace 15 file reads (~60K tokens). Typical session saves 80-100K tokens |
+| **Token Savings** | 3 targeted queries (~800 tokens) replace 15 file reads (~60K tokens). Typical session saves 80-200K+ tokens |
+| **Subagent Protocol** | Research subagents save findings to DB instead of flooding parent context. 40K → 500 tokens per subagent task |
 | **Crash Recovery** | Session dies? Next one auto-recovers from the change log. Works across both agents |
 | **Cross-Project Knowledge** | Solved a CORS issue in project A? Search it from project B. Your experience compounds |
 | **14 Fact Types** | Not dumb notes — error_fix, gotcha, api_contract, decision, pattern, procedure, and more |
@@ -469,6 +498,31 @@ Powered by [tree-sitter](https://tree-sitter.github.io/) AST parsing with langua
 | `code_impact` | Blast radius analysis — BFS traversal of incoming references. Shows what breaks at depth 1/2/3 |
 
 Indexing runs with a configurable time budget (default 30s). Partial results are usable immediately. Unresolved references are re-resolved on the next incremental run.
+
+## Subagent Memory Protocol
+
+When Claude spawns research subagents, the raw findings can be 40K+ tokens. Without the protocol, all of that goes into the parent's context window. The Subagent Memory Protocol uses the CogniLayer database as a side channel:
+
+```
+Subagent                              Parent
+   │                                     │
+   ├── research (WebSearch, Read...)     │
+   ├── synthesize findings               │
+   ├── memory_write(consolidated facts)  │  ← data goes to DB, not context
+   └── return: 500-token summary ────────┤  ← only summary enters context
+                                         │
+                        memory_search() ──┤  ← parent pulls details on demand
+```
+
+Key design decisions:
+- **Synthesis over granularity** — subagents group related findings into cohesive facts, not one-per-discovery
+- **Task-specific tags** — each subagent gets a unique tag (e.g. `tags="subagent,auth-review"`) for filtering via `memory_search(tags="auth-review")`
+- **Keywords inside facts** — each fact ends with `Search: keyword1, keyword2` so retrieval works even after context compaction
+- **Write-last pattern** — all `memory_write` calls happen as the last step before return, saving subagent turns and tokens
+- **Foreground-first** — subagents launch as foreground (reliable MCP access), user can Ctrl+B to background
+- **Graceful fallback** — if MCP tools are unavailable, findings go directly in return text
+
+The protocol is injected into CLAUDE.md automatically and requires no user configuration.
 
 ## Codex CLI Integration
 

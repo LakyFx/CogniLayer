@@ -2,7 +2,7 @@
 # CogniLayer v4 — Knowledge layer + code intelligence for AI coding agents
 
 # General
-version: "4.1.0"
+version: "4.2.0"
 language: "en"  # "en" or "cs"
 
 # Paths (auto-detected)
