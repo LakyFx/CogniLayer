@@ -9,6 +9,7 @@ from pathlib import Path
 COGNILAYER_HOME = Path.home() / ".cognilayer"
 DB_PATH = COGNILAYER_HOME / "memory.db"
 ACTIVE_SESSION_FILE = COGNILAYER_HOME / "active_session.json"
+SESSIONS_DIR = COGNILAYER_HOME / "sessions"
 
 
 def main():
@@ -34,14 +35,33 @@ def main():
     else:
         action = "edit"
 
-    # Read active session
-    try:
-        data = json.loads(ACTIVE_SESSION_FILE.read_text(encoding="utf-8"))
-        session_id = data.get("session_id", "")
-        project_name = data.get("project", "")
-        project_path = data.get("project_path", "")
-    except Exception:
-        return
+    # Extract claude_session_id from hook input and find CogniLayer session
+    claude_sid = hook_input.get("session_id", "")
+    session_id = ""
+    project_name = ""
+    project_path = ""
+
+    # Try per-session file first
+    if claude_sid:
+        session_file = SESSIONS_DIR / f"{claude_sid}.json"
+        if session_file.exists():
+            try:
+                data = json.loads(session_file.read_text(encoding="utf-8"))
+                session_id = data.get("session_id", "")
+                project_name = data.get("project", "")
+                project_path = data.get("project_path", "")
+            except Exception:
+                pass
+
+    # Fallback to legacy active_session.json
+    if not session_id:
+        try:
+            data = json.loads(ACTIVE_SESSION_FILE.read_text(encoding="utf-8"))
+            session_id = data.get("session_id", "")
+            project_name = data.get("project", "")
+            project_path = data.get("project_path", "")
+        except Exception:
+            return
 
     if not session_id or not project_name:
         return
@@ -55,11 +75,22 @@ def main():
     # Insert into DB (one INSERT + COMMIT = <1ms)
     try:
         db = sqlite3.connect(str(DB_PATH))
-        db.execute("PRAGMA busy_timeout=5000")
+        db.execute("PRAGMA busy_timeout=2000")
         db.execute("""
             INSERT INTO changes (session_id, project, file_path, action, timestamp)
             VALUES (?, ?, ?, ?, ?)
         """, (session_id, project_name, rel_path, action, datetime.now().isoformat()))
+
+        # Mark file as dirty in code_files (for incremental code re-indexing).
+        # Fire-and-forget: table may not exist, DB may be locked — that's OK.
+        try:
+            db.execute("""
+                UPDATE code_files SET is_dirty = 1
+                WHERE project = ? AND file_path = ?
+            """, (project_name, rel_path))
+        except Exception:
+            pass
+
         db.commit()
     except Exception:
         pass

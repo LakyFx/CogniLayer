@@ -1,7 +1,7 @@
 """CogniLayer MCP Server — V3 (FTS5 + vector + linking + gap tracking + episodes + causal chains + Codex).
 
 Entry point for the MCP server registered in ~/.claude/settings.json or ~/.codex/config.toml.
-Provides 13 tools for Claude Code / Codex CLI to interact with CogniLayer memory.
+Provides 17 tools for Claude Code / Codex CLI to interact with CogniLayer memory and code intelligence.
 """
 
 import logging
@@ -39,6 +39,10 @@ from tools.recommend_tech import recommend_tech
 from tools.memory_link import memory_link
 from tools.memory_chain import memory_chain
 from tools.session_init import session_init
+from tools.code_index import code_index
+from tools.code_search import code_search
+from tools.code_context import code_context
+from tools.code_impact import code_impact
 from i18n import t
 
 server = Server("cognilayer")
@@ -309,11 +313,101 @@ async def list_tools() -> list[Tool]:
                 }
             }
         ),
+        Tool(
+            name="code_index",
+            description=t("tool.code_index.desc"),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_path": {
+                        "type": "string",
+                        "description": t("tool.code_index.param.project_path")
+                    },
+                    "full": {
+                        "type": "boolean",
+                        "description": t("tool.code_index.param.full"),
+                        "default": False
+                    },
+                    "time_budget": {
+                        "type": "number",
+                        "description": t("tool.code_index.param.time_budget"),
+                        "default": 30.0
+                    }
+                }
+            }
+        ),
+        Tool(
+            name="code_search",
+            description=t("tool.code_search.desc"),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": t("tool.code_search.param.query")
+                    },
+                    "kind": {
+                        "type": "string",
+                        "description": t("tool.code_search.param.kind")
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": t("tool.code_search.param.limit"),
+                        "default": 20
+                    }
+                },
+                "required": ["query"]
+            }
+        ),
+        Tool(
+            name="code_context",
+            description=t("tool.code_context.desc"),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": t("tool.code_context.param.symbol")
+                    },
+                    "project_name": {
+                        "type": "string",
+                        "description": t("tool.code_context.param.project_name")
+                    }
+                },
+                "required": ["symbol"]
+            }
+        ),
+        Tool(
+            name="code_impact",
+            description=t("tool.code_impact.desc"),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": t("tool.code_impact.param.symbol")
+                    },
+                    "max_depth": {
+                        "type": "integer",
+                        "description": t("tool.code_impact.param.max_depth"),
+                        "default": 3
+                    },
+                    "project_name": {
+                        "type": "string",
+                        "description": t("tool.code_impact.param.project_name")
+                    }
+                },
+                "required": ["symbol"]
+            }
+        ),
     ]
 
 
 @server.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+    import time as _t
+    _start = _t.time()
+    logging.info("Tool call: %s args=%s", name, {k: str(v)[:50] for k, v in arguments.items()})
     try:
         if name == "memory_search":
             result = memory_search(
@@ -380,28 +474,81 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = session_init(
                 project_path=arguments.get("project_path")
             )
+        elif name == "code_index":
+            result = code_index(
+                project_path=arguments.get("project_path"),
+                full=arguments.get("full", False),
+                time_budget=arguments.get("time_budget", 30.0)
+            )
+        elif name == "code_search":
+            result = code_search(
+                query=arguments["query"],
+                kind=arguments.get("kind"),
+                limit=arguments.get("limit", 20)
+            )
+        elif name == "code_context":
+            result = code_context(
+                symbol=arguments["symbol"],
+                project_name=arguments.get("project_name")
+            )
+        elif name == "code_impact":
+            result = code_impact(
+                symbol=arguments["symbol"],
+                max_depth=arguments.get("max_depth", 3),
+                project_name=arguments.get("project_name")
+            )
         else:
             result = t("server.unknown_tool", name=name)
     except Exception as e:
-        logging.error("Tool %s failed: %s", name, e, exc_info=True)
+        logging.error("Tool %s failed in %.3fs: %s", name, _t.time() - _start, e, exc_info=True)
         result = t("server.tool_error", name=name, error=str(e))
 
+    _elapsed = _t.time() - _start
+    logging.info("Tool %s completed in %.3fs (%d chars)", name, _elapsed, len(result))
     return [TextContent(type="text", text=result)]
 
 
 async def main():
     logging.info("CogniLayer MCP server starting (v%s)", get_version())
 
-    # Auto-migrate schema on startup (idempotent, safe for existing DBs)
+    # Auto-migrate schema on startup with retry (handles concurrent MCP server starts)
+    import time as _time
+    for attempt in range(3):
+        try:
+            from db import open_db
+            from init_db import upgrade_schema
+            db = open_db()
+            upgrade_schema(db)
+            db.close()
+            logging.info("Schema migration OK")
+            break
+        except Exception as e:
+            if attempt < 2:
+                logging.warning("Schema migration attempt %d failed: %s, retrying...", attempt + 1, e)
+                _time.sleep(0.5 * (attempt + 1))
+            else:
+                logging.warning("Schema migration failed after 3 attempts (non-fatal): %s", e)
+
+    # Pre-load heavy native libraries BEFORE stdio_server takes over stdin/stdout.
+    # ONNX Runtime (used by fastembed) and sqlite-vec hang when loaded after
+    # stdin/stdout become MCP JSON-RPC pipes (likely due to OMP/BLAS thread init
+    # conflicting with pipe I/O on Windows).
     try:
-        from db import open_db
-        from init_db import upgrade_schema
-        db = open_db()
-        upgrade_schema(db)
-        db.close()
-        logging.info("Schema migration OK")
+        from embedder import embed_text
+        logging.info("Pre-loading embedding model...")
+        embed_text("warmup")  # Forces model load while stdout is still free
+        logging.info("Embedding model loaded OK")
     except Exception as e:
-        logging.warning("Schema migration failed (non-fatal): %s", e)
+        logging.warning("Embedding model pre-load failed (non-fatal): %s", e)
+
+    try:
+        from db import open_db, ensure_vec
+        _db = open_db()
+        ensure_vec(_db)
+        _db.close()
+        logging.info("sqlite-vec pre-loaded OK")
+    except Exception as e:
+        logging.warning("sqlite-vec pre-load failed (non-fatal): %s", e)
 
     logging.info("Starting stdio transport...")
     async with stdio_server() as (read_stream, write_stream):
@@ -428,7 +575,8 @@ def test_tools():
         tools = await list_tools()
         print(f"Registered tools: {len(tools)}")
         for tool in tools:
-            print(f"  - {tool.name}: {tool.description[:60]}...")
+            desc = tool.description[:60].encode("ascii", errors="replace").decode("ascii")
+            print(f"  - {tool.name}: {desc}...")
         return len(tools)
 
     count = asyncio.run(_test())
@@ -438,10 +586,10 @@ def test_tools():
 if __name__ == "__main__":
     if "--test" in sys.argv:
         count = test_tools()
-        if count == 13:
+        if count == 17:
             print(f"\nOK: All {count} tools registered.")
         else:
-            print(f"\nERROR: Expected 13 tools, got {count}.")
+            print(f"\nERROR: Expected 17 tools, got {count}.")
             sys.exit(1)
     else:
         import asyncio

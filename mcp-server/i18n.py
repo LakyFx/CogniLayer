@@ -317,6 +317,10 @@ _EN: dict[str, str] = {
         "  2. If it returns BLOCKED — STOP and ask the user\n"
         "  3. If it returns VERIFIED — READ the target server to the user and request confirmation\n"
         "\n"
+        "## Process Management (Windows)\n"
+        "- NEVER use `taskkill //F //IM node.exe` — it kills ALL Node.js processes INCLUDING Claude Code CLI!\n"
+        "- To stop a dev server: `npx kill-port PORT` or find PID via `netstat -ano | findstr :PORT` then `taskkill //F //PID XXXX`\n"
+        "\n"
         "## Git Rules\n"
         '- Commit often, small atomic changes. Format: "[type] what and why"\n'
         "- commit = Tier 1 (do it yourself). push = Tier 3 (verify_identity)."
@@ -431,6 +435,93 @@ _EN: dict[str, str] = {
         "- At session end: session_bridge(action=\"save\", content=\"Progress: ...; Open: ...\")\n"
         "- Before deploy/push: verify_identity(action_type=\"...\")"
     ),
+
+    # ======================================================================
+    # Code Intelligence tools (code_index, code_search, code_context, code_impact)
+    # ======================================================================
+    "tool.code_index.desc": (
+        "Index project source code (tree-sitter AST → symbols + references into SQLite). "
+        "Enables code_context, code_impact, and code_search. Incremental by default."
+    ),
+    "tool.code_index.param.project_path": "Override project path. Default: detected from session.",
+    "tool.code_index.param.full": "Force full re-index (ignore cache). Default: false (incremental).",
+    "tool.code_index.param.time_budget": "Max seconds for indexing (default 30). Partial results returned on timeout.",
+
+    "tool.code_search.desc": (
+        "Search code symbols (functions, classes, methods, interfaces) by name or signature. "
+        "Uses FTS5 fulltext. Requires code_index to be run first."
+    ),
+    "tool.code_search.param.query": "Search query — symbol name, partial name, or keyword.",
+    "tool.code_search.param.kind": "Filter by kind: function|class|method|interface|variable|type_alias|enum",
+    "tool.code_search.param.limit": "Max results (default 20, max 50).",
+
+    "tool.code_context.desc": (
+        "360° view of a code symbol: definition, who calls it (incoming), "
+        "what it calls (outgoing), children (methods). Requires code_index."
+    ),
+    "tool.code_context.param.symbol": "Symbol name or qualified name (e.g. 'open_db' or 'MyClass.method').",
+    "tool.code_context.param.project_name": "Override project. Default: current.",
+
+    "tool.code_impact.desc": (
+        "Blast radius analysis — BFS traversal of incoming references to find "
+        "everything affected by changing a symbol. Requires code_index."
+    ),
+    "tool.code_impact.param.symbol": "Symbol to analyze impact for.",
+    "tool.code_impact.param.max_depth": "Max BFS depth (1-5, default 3).",
+    "tool.code_impact.param.project_name": "Override project. Default: current.",
+
+    # Code Intelligence result messages
+    "code.no_treesitter": (
+        "tree-sitter-language-pack is not installed. "
+        "Run: pip install tree-sitter-language-pack"
+    ),
+    "code.no_project": "No active project. Run Claude in a project directory.",
+    "code.not_indexed": (
+        "Project '{project}' has no code index yet. "
+        "Run code_index first to build the symbol database."
+    ),
+    "code.db_busy": "Database is busy (another process holds the lock). Try again in a moment.",
+    "code.db_error": "Database error: {error}",
+    "code.generic_error": "Code intelligence error: {error}",
+
+    # code_index results
+    "code.index_header": "## Code Index: {project}",
+    "code.index_partial": (
+        "Indexing interrupted after {elapsed}s — partial result. "
+        "Run code_index again to continue."
+    ),
+    "code.index_complete": "Indexing completed in {elapsed}s.",
+    "code.index_stats": (
+        "- Files scanned: {files_total}\n"
+        "- Files indexed: {files_indexed} (skipped: {files_skipped})\n"
+        "- Symbols extracted: {symbols}\n"
+        "- References found: {references}\n"
+        "- References resolved: {resolved}"
+    ),
+    "code.index_errors": "Errors ({count}):",
+
+    # code_search results
+    "code.search_header": "## Found {count} symbols for '{query}'",
+    "code.search_no_results": "No symbols found for '{query}'.",
+
+    # code_context results
+    "code.context_header": "## Symbol: {symbol}",
+    "code.context_incoming": "### Incoming references ({count}):",
+    "code.context_no_incoming": "### Incoming references: none",
+    "code.context_outgoing": "### Outgoing references ({count}):",
+    "code.context_no_outgoing": "### Outgoing references: none",
+    "code.context_children": "### Children ({count}):",
+    "code.symbol_not_found": "Symbol '{symbol}' not found in code index.",
+
+    # code_impact results
+    "code.impact_header": (
+        "## Impact Analysis: {symbol}\n"
+        "**Affected:** {total} symbols in {files} files"
+    ),
+    "code.impact_no_refs": "No incoming references found — this symbol is not referenced by other code.",
+    "code.impact_depth": "### Depth {depth} ({count} symbols):",
+    "code.impact_files": "### Affected files:",
+    "code.impact_timeout": "Analysis timed out after {elapsed}s — results may be incomplete.",
 }
 
 
@@ -723,6 +814,10 @@ _CS: dict[str, str] = {
         "  2. Pokud vrati BLOCKED — ZASTAV a zeptej se uzivatele\n"
         "  3. Pokud vrati VERIFIED — PRECTI uzivateli cilovy server a pozadej potvrzeni\n"
         "\n"
+        "## Sprava procesu (Windows)\n"
+        "- NIKDY nepouzivej `taskkill //F //IM node.exe` — zabije VSECHNY Node.js procesy VCETNE Claude Code CLI!\n"
+        "- Pro zastaveni dev serveru: `npx kill-port PORT` nebo najdi PID pres `netstat -ano | findstr :PORT` a pak `taskkill //F //PID XXXX`\n"
+        "\n"
         "## Git pravidla\n"
         '- Commituj casto, male atomicke zmeny. Format: "[typ] co a proc"\n'
         "- commit = Tier 1 (delej sam). push = Tier 3 (verify_identity)."
@@ -837,6 +932,89 @@ _CS: dict[str, str] = {
         "- Na konci session: session_bridge(action=\"save\", content=\"Progress: ...; Open: ...\")\n"
         "- Pred deployem/pushem: verify_identity(action_type=\"...\")"
     ),
+
+    # ======================================================================
+    # Code Intelligence tools
+    # ======================================================================
+    "tool.code_index.desc": (
+        "Zaindexuj zdrojovy kod projektu (tree-sitter AST → symboly + reference do SQLite). "
+        "Aktivuje code_context, code_impact a code_search. Inkrementalni ve vychozim stavu."
+    ),
+    "tool.code_index.param.project_path": "Prepis cestu projektu. Vychozi: detekovana ze session.",
+    "tool.code_index.param.full": "Vynutit plnou reindexaci (ignorovat cache). Vychozi: false (inkrementalni).",
+    "tool.code_index.param.time_budget": "Max sekund pro indexaci (vychozi 30). Pri timeoutu se vrati castecny vysledek.",
+
+    "tool.code_search.desc": (
+        "Hledej symboly kodu (funkce, tridy, metody, rozhrani) podle nazvu nebo signatury. "
+        "Pouziva FTS5 fulltext. Vyzaduje predchozi spusteni code_index."
+    ),
+    "tool.code_search.param.query": "Hledany vyraz — nazev symbolu, cast nazvu, nebo klicove slovo.",
+    "tool.code_search.param.kind": "Filtr podle druhu: function|class|method|interface|variable|type_alias|enum",
+    "tool.code_search.param.limit": "Max vysledku (vychozi 20, max 50).",
+
+    "tool.code_context.desc": (
+        "360° pohled na symbol kodu: definice, kdo ho vola (incoming), "
+        "co vola (outgoing), potomci (metody). Vyzaduje code_index."
+    ),
+    "tool.code_context.param.symbol": "Nazev symbolu nebo kvalifikovany nazev (napr. 'open_db' nebo 'MyClass.method').",
+    "tool.code_context.param.project_name": "Prepis projektu. Vychozi: aktualni.",
+
+    "tool.code_impact.desc": (
+        "Analyza blast radius — BFS pruchod prichozich referenci pro nalezeni "
+        "vseho co ovlivni zmena symbolu. Vyzaduje code_index."
+    ),
+    "tool.code_impact.param.symbol": "Symbol pro analyzu dopadu.",
+    "tool.code_impact.param.max_depth": "Max BFS hloubka (1-5, vychozi 3).",
+    "tool.code_impact.param.project_name": "Prepis projektu. Vychozi: aktualni.",
+
+    # Code Intelligence result messages
+    "code.no_treesitter": (
+        "tree-sitter-language-pack neni nainstalovany. "
+        "Spust: pip install tree-sitter-language-pack"
+    ),
+    "code.no_project": "Zadny aktivni projekt. Spust Claude v projektovem adresari.",
+    "code.not_indexed": (
+        "Projekt '{project}' jeste nema code index. "
+        "Nejdriv spust code_index pro vytvoreni databaze symbolu."
+    ),
+    "code.db_busy": "Databaze je zaneprazdnena (jiny proces drzi zamek). Zkus znovu za moment.",
+    "code.db_error": "Chyba databaze: {error}",
+    "code.generic_error": "Chyba code intelligence: {error}",
+
+    "code.index_header": "## Code Index: {project}",
+    "code.index_partial": (
+        "Indexace prerusena po {elapsed}s — castecny vysledek. "
+        "Spust code_index znovu pro dokonceni."
+    ),
+    "code.index_complete": "Indexace dokoncena za {elapsed}s.",
+    "code.index_stats": (
+        "- Skenovanych souboru: {files_total}\n"
+        "- Zaindexovanych souboru: {files_indexed} (preskoceno: {files_skipped})\n"
+        "- Extrahovanych symbolu: {symbols}\n"
+        "- Nalezenych referenci: {references}\n"
+        "- Vyresenych referenci: {resolved}"
+    ),
+    "code.index_errors": "Chyby ({count}):",
+
+    "code.search_header": "## Nalezeno {count} symbolu pro '{query}'",
+    "code.search_no_results": "Zadne symboly nalezeny pro '{query}'.",
+
+    "code.context_header": "## Symbol: {symbol}",
+    "code.context_incoming": "### Prichozi reference ({count}):",
+    "code.context_no_incoming": "### Prichozi reference: zadne",
+    "code.context_outgoing": "### Odchozi reference ({count}):",
+    "code.context_no_outgoing": "### Odchozi reference: zadne",
+    "code.context_children": "### Potomci ({count}):",
+    "code.symbol_not_found": "Symbol '{symbol}' nebyl nalezen v code indexu.",
+
+    "code.impact_header": (
+        "## Analyza dopadu: {symbol}\n"
+        "**Ovlivneno:** {total} symbolu v {files} souborech"
+    ),
+    "code.impact_no_refs": "Zadne prichozi reference — tento symbol neni referencovan jinym kodem.",
+    "code.impact_depth": "### Hloubka {depth} ({count} symbolu):",
+    "code.impact_files": "### Ovlivnene soubory:",
+    "code.impact_timeout": "Analyza vyprsela po {elapsed}s — vysledky mohou byt neuplne.",
 }
 
 

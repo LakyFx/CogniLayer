@@ -87,4 +87,16 @@ def active_session(tmp_path, monkeypatch, temp_db):
     conn.commit()
     conn.close()
 
+    # Also patch code tool modules
+    for mod_name in [
+        "tools.code_index", "tools.code_search",
+        "tools.code_context", "tools.code_impact",
+    ]:
+        try:
+            mod = __import__(mod_name, fromlist=["get_active_session"])
+            if hasattr(mod, "get_active_session"):
+                monkeypatch.setattr(mod, "get_active_session", lambda: session_data)
+        except (ImportError, AttributeError):
+            pass
+
     return session_data
