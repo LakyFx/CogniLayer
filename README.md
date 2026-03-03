@@ -1,6 +1,7 @@
 # 🧠 CogniLayer v4
 
-### A shared brain for Claude Code and Codex CLI.
+### Stop re-explaining your codebase to AI.
+**Infinite speed memory · Code graph · 200K+ tokens saved**
 
 Without CogniLayer, your AI agent starts every session blind. It re-reads files, re-discovers architecture, re-learns decisions you explained last week. On a 50-file project, that's 80-100K tokens burned before real work begins.
 
