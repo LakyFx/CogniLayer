@@ -1,16 +1,16 @@
 # CogniLayer v4
 
-### Your AI agent just got mass, context and a memory.
+### One brain for Claude Code & Codex CLI. Shared knowledge, code intelligence, zero re-learning.
 
-Claude Code is powerful, but it starts every session blind — re-reads files, re-discovers architecture, re-learns your decisions. On a 50-file project that's 80-100K tokens burned before real work begins. **CogniLayer fixes that.**
+Debug a tricky auth issue with Claude Code in the morning, switch to Codex CLI in the afternoon — **it already knows what happened.** No re-reading files, no re-explaining architecture, no wasted tokens. That's not just persistent memory, that's **agent interoperability**.
 
-It's a local MCP server that gives your AI coding agent three things it doesn't have:
+AI coding agents are powerful, but they start every session blind — re-read files, re-discover architecture, re-learn your decisions. On a 50-file project that's 80-100K tokens burned before real work begins. **CogniLayer fixes that.**
 
-1. **Persistent knowledge** — facts, decisions, gotchas, error fixes survive across sessions and crashes
+It's a local MCP server that gives Claude Code and Codex CLI three things they don't have:
+
+1. **Shared persistent knowledge** — facts, decisions, gotchas, error fixes survive across sessions, crashes, and agents. Start in Claude Code, finish in Codex — same brain
 2. **Code intelligence** — understands your codebase structure: who calls what, what breaks if you change something
 3. **Safety layer** — verifies deployment targets before you push to the wrong server
-
-> Works with **Claude Code** and **OpenAI Codex CLI** — same brain, two agents.
 
 [![Version](https://img.shields.io/badge/version-4.0.0-orange.svg)](#)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](LICENSE)
