@@ -11,7 +11,7 @@ if _mcp_path not in sys.path:
     sys.path.insert(0, _mcp_path)
 
 
-def test_all_13_tools_registered():
+def test_all_17_tools_registered():
     """Server should register exactly 17 tools."""
     from server import list_tools
 

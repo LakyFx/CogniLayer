@@ -89,14 +89,20 @@ def check_database():
         ).fetchall()]
         db.close()
         has_core = all(t in tables for t in ["facts", "projects", "sessions"])
+        has_code = "code_symbols" in tables
+        detail = f"{len(tables)} tables found"
+        if not has_core:
+            detail += " (missing core tables: facts, projects, sessions)"
+        elif not has_code:
+            detail += " (missing Code Intelligence tables — re-run install.py)"
         check(
             "Database schema",
             has_core,
-            f"{len(tables)} tables found" + (
-                "" if has_core else " (missing core tables: facts, projects, sessions)"
-            ),
+            detail,
             "Run: python install.py (will re-initialize schema)" if not has_core else "",
         )
+        if has_core and not has_code:
+            warn("Code Intelligence tables missing", "Run: python install.py to upgrade schema")
         return has_core
     except Exception as e:
         check("Database readable", False, str(e))
@@ -187,6 +193,35 @@ def check_textual():
                 False,
                 "Not installed (needed for TUI)",
                 f"Run: {sys.executable} -m pip install textual",
+            )
+        return ok
+
+
+def check_treesitter():
+    """Check tree-sitter-language-pack (required for Code Intelligence)."""
+    try:
+        import tree_sitter_language_pack  # noqa: F401
+        check("tree-sitter-language-pack", True, "Code Intelligence available")
+        return True
+    except ImportError:
+        ok = False
+        if FIX_MODE:
+            print(f"         {CYAN}Attempting auto-fix...{RESET}")
+            try:
+                subprocess.check_call(
+                    [sys.executable, "-m", "pip", "install", "tree-sitter-language-pack"],
+                    stdout=subprocess.DEVNULL,
+                )
+                ok = True
+                check("tree-sitter-language-pack", True, "auto-installed")
+            except Exception:
+                pass
+        if not ok:
+            check(
+                "tree-sitter-language-pack",
+                False,
+                "Not installed (Code Intelligence disabled)",
+                f"Run: {sys.executable} -m pip install tree-sitter-language-pack",
             )
         return ok
 
@@ -344,7 +379,7 @@ def check_server_subprocess(python_cmd: str, server_path: str):
 
 def check_hooks():
     """Check hook files exist."""
-    hooks = ["on_session_start.py", "on_session_end.py", "on_file_change.py"]
+    hooks = ["on_session_start.py", "on_session_end.py", "on_pre_compact.py", "on_file_change.py"]
     hooks_dir = COGNILAYER_HOME / "hooks"
     all_ok = True
     for hook in hooks:
@@ -423,6 +458,7 @@ def main():
     check_mcp_package()
     check_pyyaml()
     check_textual()
+    check_treesitter()
     check_optional_deps()
 
     print("\n[3/7] CogniLayer home")

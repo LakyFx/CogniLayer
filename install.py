@@ -43,14 +43,28 @@ def check_python_version():
         sys.exit(1)
 
 
+def _pip_install(package: str, label: str = None):
+    """Install a pip package, with clear error on failure."""
+    label = label or package
+    try:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", package],
+            stdout=subprocess.DEVNULL,
+        )
+        print(f"[ok] {label} installed")
+    except subprocess.CalledProcessError:
+        print(f"[ERROR] Failed to install {label}.")
+        print(f"  Run manually: {sys.executable} -m pip install {package}")
+        sys.exit(1)
+
+
 def check_mcp_installed():
     try:
         import mcp  # noqa: F401
         print("[ok] mcp package found")
     except ImportError:
         print("[!] mcp package not found. Installing...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "mcp"])
-        print("[ok] mcp installed")
+        _pip_install("mcp")
 
 
 def check_pyyaml_installed():
@@ -59,8 +73,7 @@ def check_pyyaml_installed():
         print("[ok] pyyaml package found")
     except ImportError:
         print("[!] pyyaml package not found. Installing...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyyaml"])
-        print("[ok] pyyaml installed")
+        _pip_install("pyyaml")
 
 
 def check_textual_installed():
@@ -69,8 +82,16 @@ def check_textual_installed():
         print(f"[ok] textual package found (v{textual.__version__})")
     except ImportError:
         print("[!] textual not found. Installing (needed for TUI dashboard)...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "textual"])
-        print("[ok] textual installed")
+        _pip_install("textual")
+
+
+def check_treesitter_installed():
+    try:
+        import tree_sitter_language_pack  # noqa: F401
+        print("[ok] tree-sitter-language-pack found")
+    except ImportError:
+        print("[!] tree-sitter-language-pack not found. Installing (needed for Code Intelligence)...")
+        _pip_install("tree-sitter-language-pack")
 
 
 def backup_database():
@@ -134,6 +155,7 @@ def copy_files():
         COGNILAYER_HOME / "mcp-server" / "indexer",
         COGNILAYER_HOME / "mcp-server" / "search",
         COGNILAYER_HOME / "mcp-server" / "tools",
+        COGNILAYER_HOME / "mcp-server" / "code" / "parsers",
         COGNILAYER_HOME / "hooks",
         COGNILAYER_HOME / "logs",
         COGNILAYER_HOME / "cache" / "embeddings",
@@ -334,6 +356,8 @@ def main():
     check_mcp_installed()
     check_pyyaml_installed()
     check_textual_installed()
+    check_treesitter_installed()
+    print("  [info] Optional (vector search): pip install fastembed sqlite-vec")
 
     print("\n[3/6] Copying files...")
     copy_files()
@@ -370,8 +394,9 @@ def main():
     print("  1. Restart Claude Code (required for MCP server to connect)")
     print("  2. Edit ~/.cognilayer/config.yaml — set projects.base_path")
     print("  3. Run /onboard to build initial memory")
-    print("  4. Run /cognihelp to see all commands")
-    print("  5. Run 'cognilayer' in terminal for TUI dashboard")
+    print("  4. Use code_index() in Claude Code to index your codebase")
+    print("  5. Run /cognihelp to see all commands")
+    print("  6. Run 'cognilayer' in terminal for TUI dashboard")
     print()
     print("  Trouble? Run: python diagnose.py --fix")
     print()

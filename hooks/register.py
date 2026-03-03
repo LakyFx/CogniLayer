@@ -37,6 +37,7 @@ def register():
     hook_start = f'"{python_cmd}" "{home_str}/hooks/on_session_start.py"'
     hook_end = f'"{python_cmd}" "{home_str}/hooks/on_session_end.py"'
     hook_change = f'"{python_cmd}" "{home_str}/hooks/on_file_change.py"'
+    hook_compact = f'"{python_cmd}" "{home_str}/hooks/on_pre_compact.py"'
 
     cognilayer_hooks = {
         "SessionStart": {
@@ -46,6 +47,10 @@ def register():
         "SessionEnd": {
             "matcher": "*",
             "hooks": [{"type": "command", "command": hook_end}]
+        },
+        "PreCompact": {
+            "matcher": "*",
+            "hooks": [{"type": "command", "command": hook_compact}]
         },
         "PostToolUse": {
             "matcher": "Write|Edit|NotebookEdit",
@@ -73,7 +78,7 @@ def register():
 
     print(f"CogniLayer registered in {CLAUDE_SETTINGS}")
     print(f"  MCP server: {server_path}")
-    print(f"  Hooks: SessionStart, SessionEnd, PostToolUse")
+    print(f"  Hooks: SessionStart, SessionEnd, PreCompact, PostToolUse")
     return settings
 
 

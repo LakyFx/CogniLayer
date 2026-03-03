@@ -12,7 +12,7 @@ With CogniLayer, it already knows. Three things your agent doesn't have today:
 
 ⚡ **80-100K tokens saved per session** — 3 semantic queries replace 15 file reads. Your agent works faster because it already knows your codebase
 
-[![Version](https://img.shields.io/badge/version-4.0.0-orange.svg)](#)
+[![Version](https://img.shields.io/badge/version-4.1.0-orange.svg)](#)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-green.svg)](https://www.python.org/)
 [![MCP Server](https://img.shields.io/badge/MCP-17%20tools-purple.svg)](https://modelcontextprotocol.io/)
