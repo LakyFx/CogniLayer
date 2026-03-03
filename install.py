@@ -338,43 +338,61 @@ def test_server():
         print(f"\n[ERROR] Could not test server: {e}")
 
 
+def generate_agents_md():
+    """Generate AGENTS.md in current directory for Codex CLI."""
+    try:
+        sys.path.insert(0, str(COGNILAYER_HOME / "hooks"))
+        sys.path.insert(0, str(COGNILAYER_HOME / "mcp-server"))
+        from generate_agents_md import main as gen_main
+        gen_main()
+    except Exception as e:
+        print(f"  [WARNING] Could not generate AGENTS.md: {e}")
+        print(f"  Run manually: python {COGNILAYER_HOME}/hooks/generate_agents_md.py")
+
+
 def main():
     codex_mode = "--codex" in sys.argv
     both_mode = "--both" in sys.argv
     target = "Codex CLI" if codex_mode else "Both" if both_mode else "Claude Code"
+    need_codex = codex_mode or both_mode
+    total_steps = 7 if need_codex else 6
 
     print("=" * 50)
     print(f"  CogniLayer v{VERSION} Installer ({target})")
     print("=" * 50)
     print()
 
-    print("[1/6] Checking Python version...")
+    print(f"[1/{total_steps}] Checking Python version...")
     check_python_version()
     print(f"  [ok] Python {sys.version.split()[0]}")
 
-    print("\n[2/6] Checking dependencies...")
+    print(f"\n[2/{total_steps}] Checking dependencies...")
     check_mcp_installed()
     check_pyyaml_installed()
     check_textual_installed()
     check_treesitter_installed()
     print("  [info] Optional (vector search): pip install fastembed sqlite-vec")
 
-    print("\n[3/6] Copying files...")
+    print(f"\n[3/{total_steps}] Copying files...")
     copy_files()
 
-    print("\n[4/6] Backing up database...")
+    print(f"\n[4/{total_steps}] Backing up database...")
     backup_database()
 
-    print("\n[5/6] Initializing database...")
+    print(f"\n[5/{total_steps}] Initializing database...")
     init_database()
 
-    print("\n[6/6] Registering...")
+    print(f"\n[6/{total_steps}] Registering...")
     if both_mode:
         register_mcp(codex=False)
         print()
         register_mcp(codex=True)
     else:
         register_mcp(codex=codex_mode)
+
+    if need_codex:
+        print(f"\n[7/{total_steps}] Generating AGENTS.md for Codex CLI...")
+        generate_agents_md()
 
     # Run verification
     print("\nRunning verification...")
@@ -388,15 +406,40 @@ def main():
     print()
     print(f"  Python:     {python_cmd}")
     print(f"  Home:       {str(COGNILAYER_HOME).replace(chr(92), '/')}")
-    print(f"  Settings:   {str(CLAUDE_SETTINGS).replace(chr(92), '/')}" if not codex_mode else "")
+    if not codex_mode:
+        print(f"  Settings:   {str(CLAUDE_SETTINGS).replace(chr(92), '/')}")
     print()
-    print("  Next steps:")
-    print("  1. Restart Claude Code (required for MCP server to connect)")
-    print("  2. Edit ~/.cognilayer/config.yaml — set projects.base_path")
-    print("  3. Run /onboard to build initial memory")
-    print("  4. Use code_index() in Claude Code to index your codebase")
-    print("  5. Run /cognihelp to see all commands")
-    print("  6. Run 'cognilayer' in terminal for TUI dashboard")
+
+    if codex_mode:
+        print("  Next steps:")
+        print("  1. Open your project directory and run: codex")
+        print("  2. Codex will auto-detect CogniLayer via AGENTS.md")
+        print("  3. It will call session_init() to load project context")
+        print("  4. Say: 'Scan this project and build memory' for onboarding")
+        print("  5. Say: 'Index the source code' for code intelligence")
+        print("  6. Run 'cognilayer' in terminal for TUI dashboard")
+        print()
+        print("  For each new project, generate AGENTS.md:")
+        print(f"  python {COGNILAYER_HOME}/hooks/generate_agents_md.py".replace("\\", "/"))
+    elif both_mode:
+        print("  Next steps:")
+        print("  1. Restart Claude Code (required for MCP server to connect)")
+        print("  2. Edit ~/.cognilayer/config.yaml — set projects.base_path")
+        print("  3. Claude Code: Run /onboard to build initial memory")
+        print("  4. Codex CLI: Open project dir and run 'codex'")
+        print("  5. Run 'cognilayer' in terminal for TUI dashboard")
+        print()
+        print("  For each new Codex project, generate AGENTS.md:")
+        print(f"  python {COGNILAYER_HOME}/hooks/generate_agents_md.py".replace("\\", "/"))
+    else:
+        print("  Next steps:")
+        print("  1. Restart Claude Code (required for MCP server to connect)")
+        print("  2. Edit ~/.cognilayer/config.yaml — set projects.base_path")
+        print("  3. Run /onboard to build initial memory")
+        print("  4. Use code_index() in Claude Code to index your codebase")
+        print("  5. Run /cognihelp to see all commands")
+        print("  6. Run 'cognilayer' in terminal for TUI dashboard")
+
     print()
     print("  Trouble? Run: python diagnose.py --fix")
     print()
