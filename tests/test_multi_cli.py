@@ -138,14 +138,19 @@ def open_test_db(db_path):
 # ==============================================================================
 
 class TestBusyTimeout:
-    def test_db_py_has_30000(self):
+    def test_db_py_has_30000(self, tmp_path):
         """db.py open_db() sets busy_timeout=30000."""
         sys.path.insert(0, str(Path(__file__).parent.parent / "mcp-server"))
-        from db import open_db
-        db = open_db()
-        val = db.execute("PRAGMA busy_timeout").fetchone()[0]
-        db.close()
-        assert val == 30000, f"Expected 30000, got {val}"
+        import db as db_module
+        original = db_module.DB_PATH
+        db_module.DB_PATH = tmp_path / "test_busy.db"
+        try:
+            db = db_module.open_db()
+            val = db.execute("PRAGMA busy_timeout").fetchone()[0]
+            db.close()
+            assert val == 30000, f"Expected 30000, got {val}"
+        finally:
+            db_module.DB_PATH = original
 
     def test_on_session_start_has_30000(self, tmp_cognilayer):
         """on_session_start open_db() delegates to db.open_db_fast (busy_timeout=30000)."""
@@ -159,11 +164,11 @@ class TestBusyTimeout:
         content = source.read_text(encoding="utf-8")
         assert "open_db_fast" in content, "on_session_end.py should delegate to db.open_db_fast"
 
-    def test_on_file_change_has_short_timeout(self):
-        """on_file_change uses short busy_timeout (hook must be <100ms)."""
+    def test_on_file_change_has_30000_timeout(self):
+        """on_file_change uses busy_timeout=30000 (WAL + long timeout for safety)."""
         source = Path(__file__).parent.parent / "hooks" / "on_file_change.py"
         content = source.read_text(encoding="utf-8")
-        assert "busy_timeout=2000" in content, "on_file_change.py should use busy_timeout=2000"
+        assert "busy_timeout=30000" in content, "on_file_change.py should use busy_timeout=30000"
 
     def test_no_old_5000_in_hooks(self):
         """No hook file should still have busy_timeout=5000."""

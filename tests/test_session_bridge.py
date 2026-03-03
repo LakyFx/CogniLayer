@@ -1,12 +1,22 @@
 """Tests for session_bridge tool."""
 
+from datetime import datetime
+
 
 def test_save_and_load_bridge(temp_db, active_session):
     """Should save and load a session bridge."""
     from tools.session_bridge import session_bridge
+    import db as db_module
 
     save_result = session_bridge(action="save", content="Progress: fixed auth bug; Open: write tests")
     assert "saved" in save_result.lower() or "ulozen" in save_result.lower()
+
+    # Close the session so load can find it (load queries end_time IS NOT NULL)
+    conn = db_module.open_db()
+    conn.execute("UPDATE sessions SET end_time = ? WHERE id = ?",
+                 (datetime.now().isoformat(), active_session["session_id"]))
+    conn.commit()
+    conn.close()
 
     load_result = session_bridge(action="load")
     assert "fixed auth bug" in load_result
