@@ -9,7 +9,7 @@ Use Claude Code in the morning, switch to Codex CLI in the afternoon — **they 
 CogniLayer gives your AI coding agents a **shared brain** — a local SQLite database with 13 MCP tools, hybrid search, and automatic session tracking. Every fact, decision, gotcha, and debugging session survives across sessions, agents, projects, and crashes.
 
 [![Version](https://img.shields.io/badge/version-3.1.0-orange.svg)](#)
-[![License: GPL-3.0](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
+[![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-green.svg)](https://www.python.org/)
 [![MCP Server](https://img.shields.io/badge/MCP-13%20tools-purple.svg)](https://modelcontextprotocol.io/)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-supported-blueviolet.svg)](#)
@@ -373,4 +373,4 @@ Contributions are welcome! Please open an issue first to discuss what you'd like
 
 ## License
 
-[GPL-3.0](LICENSE)
+[Elastic License 2.0](LICENSE) — Free to use, modify, and distribute. You may not provide it as a managed/hosted service.
