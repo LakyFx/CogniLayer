@@ -5,14 +5,18 @@ Includes lazy crash recovery and auto-identity detection
 """
 
 import json
+import logging
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+
+_log = logging.getLogger("cognilayer.tools.project_context")
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from db import open_db
 from utils import get_active_session
 from i18n import t
+from tools.identity_set import ALL_FIELDS as _IDENTITY_COLUMNS
 
 COGNILAYER_HOME = Path.home() / ".cognilayer"
 SESSIONS_DIR = COGNILAYER_HOME / "sessions"
@@ -72,7 +76,21 @@ def _check_crash_recovery(db, project: str) -> str | None:
         if claude_sid:
             session_file = SESSIONS_DIR / f"{claude_sid}.json"
             if session_file.exists():
-                continue  # Session still alive, skip
+                # Time-based override: if session is >6 hours old, treat file as stale
+                try:
+                    start_dt = datetime.fromisoformat(start_time)
+                    if start_dt.tzinfo:
+                        start_dt = start_dt.replace(tzinfo=None)
+                    age_hours = (datetime.now() - start_dt).total_seconds() / 3600
+                    if age_hours < 6:
+                        continue  # Session likely still alive, skip
+                    # Stale file — clean it up and proceed with recovery
+                    try:
+                        session_file.unlink()
+                    except OSError:
+                        pass
+                except (ValueError, TypeError):
+                    continue  # Can't parse start_time, skip
 
         # Build emergency bridge if the crashed session has none
         if not bridge_content:
@@ -129,8 +147,8 @@ def _auto_detect_identity(db, project: str, project_path: Path):
                 else "pnpm" if (project_path / "pnpm-lock.yaml").exists()
                 else "npm"
             )
-        except Exception:
-            pass
+        except Exception as e:
+            _log.debug("Auto-detect: package.json parse failed for %s: %s", project, e)
 
     # PHP detection
     if list(project_path.glob("*.php"))[:1] and "framework" not in card:
@@ -146,8 +164,8 @@ def _auto_detect_identity(db, project: str, project_path: Path):
                 card["framework"] = "fastapi"
             elif "django" in content.lower():
                 card["framework"] = "django"
-        except Exception:
-            pass
+        except Exception as e:
+            _log.debug("Auto-detect: pyproject.toml parse failed for %s: %s", project, e)
 
     # Docker detection
     if (project_path / "docker-compose.yml").exists() or (project_path / "docker-compose.yaml").exists():
@@ -162,8 +180,8 @@ def _auto_detect_identity(db, project: str, project_path: Path):
                 if "url = " in line and "github.com" in line:
                     card["github_repo_url"] = line.split("url = ")[1].strip()
                     break
-        except Exception:
-            pass
+        except Exception as e:
+            _log.debug("Auto-detect: .git/config parse failed for %s: %s", project, e)
 
     # Category heuristic
     fw = card.get("framework", "")
@@ -178,11 +196,13 @@ def _auto_detect_identity(db, project: str, project_path: Path):
         columns = ["project", "created", "updated"]
         values = [project, now, now]
         for k, v in card.items():
+            if k not in _IDENTITY_COLUMNS:
+                continue  # Skip unknown columns — safety whitelist
             columns.append(k)
             values.append(v)
         placeholders = ", ".join(["?"] * len(columns))
         db.execute(
-            f"INSERT INTO project_identity ({', '.join(columns)}) VALUES ({placeholders})",
+            f"INSERT OR IGNORE INTO project_identity ({', '.join(columns)}) VALUES ({placeholders})",
             values
         )
         db.commit()
@@ -217,10 +237,10 @@ def project_context() -> str:
 
         dna = proj[0] or t("project_context.dna_placeholder", project=project)
 
-        # Get latest bridge from last completed session
+        # Get latest bridge from last completed session (unified filter across all components)
         bridge_row = db.execute("""
             SELECT bridge_content, start_time, end_time FROM sessions
-            WHERE project = ? AND bridge_content IS NOT NULL
+            WHERE project = ? AND end_time IS NOT NULL AND bridge_content IS NOT NULL
             ORDER BY start_time DESC LIMIT 1
         """, (project,)).fetchone()
 
@@ -302,6 +322,14 @@ def project_context() -> str:
             episodes = [(r[0], r[1], r[2]) for r in ep_rows]
         except Exception:
             pass  # episode columns might not exist yet
+
+        # Auto-consolidation: run if >24h since last run and project has enough facts
+        try:
+            from tools.consolidate import should_auto_consolidate, consolidate as _consolidate
+            if should_auto_consolidate(db, project):
+                _consolidate(project)
+        except Exception:
+            pass  # Consolidation failure must not break project_context
 
         # V3 Tier 2: Memory Organization
         cluster_count = 0

@@ -190,12 +190,22 @@ def index_project(db: sqlite3.Connection, project: str, project_path: str,
             else:
                 raise
 
-    # Phase 3b: Resolve references
-    if stats["files_indexed"] > 0:
-        try:
+    # Phase 3b: Resolve references (always run if there are unresolved refs, not just new files)
+    try:
+        unresolved = db.execute("""
+            SELECT COUNT(*) FROM code_references
+            WHERE project = ? AND to_symbol_id IS NULL
+        """, (project,)).fetchone()[0]
+
+        if stats["files_indexed"] > 0 or unresolved > 0:
             stats["resolved"] = resolve_references(db, project)
-        except Exception as e:
-            _log.warning("Reference resolution failed: %s", e)
+    except Exception as e:
+        _log.warning("Reference resolution failed: %s", e)
+
+    # If partial, mark remaining un-indexed files for next run
+    if stats["partial"]:
+        _log.info("Partial index: %d files remain, will be indexed on next run",
+                  len(files_to_index) - stats["files_indexed"])
 
     stats["elapsed"] = time.time() - start_time
     return stats

@@ -76,11 +76,11 @@ def _find_clusters(db, project: str) -> int:
     db.execute("DELETE FROM fact_clusters WHERE project = ?", (project,))
 
     for component in clusters:
-        db.execute("""
+        cursor = db.execute("""
             INSERT INTO fact_clusters (project, fact_count, created, updated)
             VALUES (?, ?, ?, ?)
         """, (project, len(component), now, now))
-        cluster_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        cluster_id = cursor.lastrowid
 
         for fid in component:
             db.execute(
@@ -291,6 +291,31 @@ def _summarize_clusters(db, project: str) -> int:
     return labeled
 
 
+def should_auto_consolidate(db, project: str) -> bool:
+    """Check if auto-consolidation should run. Conditions:
+    1. Has not run in the last 24 hours for this project
+    2. Project has at least 10 facts
+    """
+    try:
+        row = db.execute(
+            "SELECT last_consolidated FROM projects WHERE name = ?", (project,)
+        ).fetchone()
+        if row and row[0]:
+            from datetime import timedelta
+            last = datetime.fromisoformat(row[0])
+            if last.tzinfo:
+                last = last.replace(tzinfo=None)
+            if (datetime.now() - last).total_seconds() < 86400:
+                return False  # Ran within last 24h
+    except Exception:
+        pass  # Column may not exist
+
+    count = db.execute(
+        "SELECT COUNT(*) FROM facts WHERE project = ?", (project,)
+    ).fetchone()[0]
+    return count >= 10
+
+
 def consolidate(project: str = None) -> str:
     """Run full memory consolidation for a project. Returns summary report."""
     if not project:
@@ -306,6 +331,14 @@ def consolidate(project: str = None) -> str:
         tier_counts = _compute_tiers(db, project)
         contradiction_count = _detect_contradictions(db, project)
         labeled = _summarize_clusters(db, project)
+
+        # Mark consolidation time (best-effort)
+        try:
+            db.execute("UPDATE projects SET last_consolidated = ? WHERE name = ?",
+                       (datetime.now().isoformat(), project))
+            db.commit()
+        except Exception:
+            pass  # Column may not exist
     finally:
         db.close()
 

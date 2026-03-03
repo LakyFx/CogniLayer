@@ -21,7 +21,7 @@ def session_bridge(action: str, content: str = None) -> str:
         try:
             row = db.execute("""
                 SELECT bridge_content, start_time, end_time FROM sessions
-                WHERE project = ? AND bridge_content IS NOT NULL
+                WHERE project = ? AND end_time IS NOT NULL AND bridge_content IS NOT NULL
                 ORDER BY start_time DESC LIMIT 1
             """, (project,)).fetchone()
         finally:

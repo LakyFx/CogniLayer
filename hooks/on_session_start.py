@@ -156,10 +156,71 @@ def get_latest_bridge(db, project: str) -> str | None:
 
 
 def create_session(db, project: str, claude_session_id: str | None = None) -> str:
+    now = datetime.now().isoformat()
+
+    # Close any previous open sessions with the same claude_session_id
+    # (happens on context compacting — SessionStart fires again).
+    # Preserve data: build emergency bridge if none exists.
+    if claude_session_id:
+        prev_sessions = db.execute("""
+            SELECT id, bridge_content FROM sessions
+            WHERE claude_session_id = ? AND end_time IS NULL
+        """, (claude_session_id,)).fetchall()
+        for prev in prev_sessions:
+            prev_id, prev_bridge = prev[0], prev[1]
+            if not prev_bridge:
+                # Build emergency bridge from changes + facts of the old session
+                changed = db.execute("""
+                    SELECT DISTINCT file_path, action FROM changes
+                    WHERE session_id = ? ORDER BY timestamp
+                """, (prev_id,)).fetchall()
+                facts = db.execute("""
+                    SELECT type, substr(content, 1, 80) FROM facts
+                    WHERE session_id = ? ORDER BY timestamp
+                """, (prev_id,)).fetchall()
+                parts = ["[auto-bridge from context compacting]"]
+                if changed:
+                    parts.append("Files: " + ", ".join(
+                        f"{c[0]} ({c[1]})" for c in changed[:10]))
+                if facts:
+                    parts.append("Facts: " + "; ".join(
+                        f"[{f[0]}] {f[1]}" for f in facts[:5]))
+                if changed or facts:
+                    prev_bridge = "\n".join(parts)
+                    db.execute("UPDATE sessions SET bridge_content = ? WHERE id = ?",
+                               (prev_bridge, prev_id))
+            db.execute("""
+                UPDATE sessions SET end_time = ?, summary = 'closed: context compacting'
+                WHERE id = ?
+            """, (now, prev_id))
+
+    # Also close very old orphaned sessions for this project (>6 hours)
+    cutoff_6h = (datetime.now() - __import__('datetime').timedelta(hours=6)).isoformat()
+    old_orphans = db.execute("""
+        SELECT id, bridge_content FROM sessions
+        WHERE project = ? AND end_time IS NULL AND start_time < ?
+    """, (project, cutoff_6h)).fetchall()
+    for orphan in old_orphans:
+        orphan_id, orphan_bridge = orphan[0], orphan[1]
+        if not orphan_bridge:
+            changed = db.execute("""
+                SELECT DISTINCT file_path, action FROM changes
+                WHERE session_id = ? ORDER BY timestamp
+            """, (orphan_id,)).fetchall()
+            if changed:
+                orphan_bridge = "[auto-bridge from orphan cleanup]\nFiles: " + \
+                    ", ".join(f"{c[0]} ({c[1]})" for c in changed[:10])
+                db.execute("UPDATE sessions SET bridge_content = ? WHERE id = ?",
+                           (orphan_bridge, orphan_id))
+        db.execute("""
+            UPDATE sessions SET end_time = ?, summary = 'closed: orphan >6h'
+            WHERE id = ?
+        """, (now, orphan_id))
+
     session_id = str(uuid.uuid4())
     db.execute(
         "INSERT INTO sessions (id, project, start_time, claude_session_id) VALUES (?, ?, ?, ?)",
-        (session_id, project, datetime.now().isoformat(), claude_session_id)
+        (session_id, project, now, claude_session_id)
     )
     return session_id
 
@@ -282,6 +343,48 @@ def main():
         inject_cognilayer_block(project_path / "CLAUDE.md", dna, bridge)
     except Exception as e:
         sys.stderr.write(f"CogniLayer SessionStart file write error: {e}\n")
+
+    # Cleanup stale session files (best-effort, after our own session file is written)
+    try:
+        _cleanup_stale_session_files()
+    except Exception:
+        pass
+
+
+def _cleanup_stale_session_files():
+    """Remove session files for sessions already closed in DB or orphaned >24h."""
+    if not SESSIONS_DIR.exists():
+        return
+
+    db = open_db()
+    try:
+        now = time.time()
+        for f in SESSIONS_DIR.iterdir():
+            if not f.name.endswith(".json"):
+                continue
+            claude_sid = f.stem
+            row = db.execute(
+                "SELECT end_time FROM sessions WHERE claude_session_id = ? ORDER BY start_time DESC LIMIT 1",
+                (claude_sid,)
+            ).fetchone()
+
+            if row and row[0]:
+                # Session is closed in DB — safe to delete
+                try:
+                    f.unlink()
+                except OSError:
+                    pass
+            elif row is None:
+                # Not in DB at all — delete only if older than 24h
+                try:
+                    age_hours = (now - f.stat().st_mtime) / 3600
+                    if age_hours > 24:
+                        f.unlink()
+                except OSError:
+                    pass
+            # else: row exists but end_time is NULL — session is alive, leave it
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ clusters, contradictions, causal chains, episode storage.
 
 import sqlite3
 import sys
+from datetime import datetime
 from pathlib import Path
 
 # Allow running standalone or as module
@@ -53,6 +54,21 @@ CREATE TABLE IF NOT EXISTS facts (
     cluster_id INTEGER,
     FOREIGN KEY (project) REFERENCES projects(name)
 );
+
+-- Fact version history (audit trail for updates and deletes)
+CREATE TABLE IF NOT EXISTS facts_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fact_id TEXT NOT NULL,
+    project TEXT NOT NULL,
+    content TEXT NOT NULL,
+    type TEXT NOT NULL,
+    domain TEXT,
+    tags TEXT,
+    action TEXT NOT NULL CHECK(action IN ('update', 'delete')),
+    changed_at TEXT NOT NULL,
+    session_id TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_facts_history_fact ON facts_history(fact_id);
 
 -- Indexed project files (chunks)
 CREATE TABLE IF NOT EXISTS file_chunks (
@@ -582,7 +598,66 @@ def upgrade_schema(db):
         CREATE INDEX IF NOT EXISTS idx_code_refs_from ON code_references(from_symbol_id);
         CREATE INDEX IF NOT EXISTS idx_code_refs_to ON code_references(to_symbol_id);
         CREATE INDEX IF NOT EXISTS idx_code_refs_to_name ON code_references(to_name);
+
+        -- Schema version tracking
+        CREATE TABLE IF NOT EXISTS schema_version (
+            version INTEGER PRIMARY KEY,
+            applied TEXT NOT NULL,
+            description TEXT
+        );
+
+        -- Retrieval log for tracking fact usage
+        CREATE TABLE IF NOT EXISTS retrieval_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fact_id TEXT NOT NULL,
+            project TEXT NOT NULL,
+            query TEXT,
+            search_type TEXT,
+            timestamp TEXT NOT NULL,
+            FOREIGN KEY (fact_id) REFERENCES facts(id) ON DELETE CASCADE,
+            FOREIGN KEY (project) REFERENCES projects(name)
+        );
+        CREATE INDEX IF NOT EXISTS idx_retrieval_log_fact ON retrieval_log(fact_id);
+        CREATE INDEX IF NOT EXISTS idx_retrieval_log_project ON retrieval_log(project);
+
+        -- Fact version history (audit trail for updates and deletes)
+        CREATE TABLE IF NOT EXISTS facts_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fact_id TEXT NOT NULL,
+            project TEXT NOT NULL,
+            content TEXT NOT NULL,
+            type TEXT NOT NULL,
+            domain TEXT,
+            tags TEXT,
+            action TEXT NOT NULL CHECK(action IN ('update', 'delete')),
+            changed_at TEXT NOT NULL,
+            session_id TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_facts_history_fact ON facts_history(fact_id);
     """)
+
+    # New columns on projects table (cross-instance coordination)
+    for col, typedef in [
+        ("last_decay", "TEXT"),
+        ("last_consolidated", "TEXT"),
+    ]:
+        try:
+            db.execute(f"ALTER TABLE projects ADD COLUMN {col} {typedef}")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+    # Record current schema version
+    try:
+        existing = db.execute("SELECT MAX(version) FROM schema_version").fetchone()
+        current_version = existing[0] if existing and existing[0] else 0
+        if current_version < 5:
+            db.execute("""
+                INSERT OR IGNORE INTO schema_version (version, applied, description)
+                VALUES (5, ?, 'QA fixes: schema_version, retrieval_log, last_decay, last_consolidated')
+            """, (datetime.now().isoformat(),))
+    except Exception:
+        pass  # Table may not exist yet (first migration)
+
     db.commit()
 
 

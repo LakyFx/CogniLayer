@@ -78,6 +78,19 @@ def code_index(project_path: str | None = None,
             if len(stats["errors"]) > 5:
                 lines.append(f"  ... and {len(stats['errors']) - 5} more")
 
+        # Always show DB totals so incremental runs don't look empty
+        try:
+            total_sym = db.execute(
+                "SELECT COUNT(*) FROM code_symbols WHERE project = ?", (project,)
+            ).fetchone()[0]
+            total_ref = db.execute(
+                "SELECT COUNT(*) FROM code_references WHERE project = ?", (project,)
+            ).fetchone()[0]
+            lines.append(t("code.index_db_totals",
+                           symbols=total_sym, references=total_ref))
+        except Exception:
+            pass
+
         return "\n".join(lines)
 
     except sqlite3.OperationalError as e:
@@ -103,28 +116,49 @@ def _ensure_tables(db: sqlite3.Connection) -> None:
         # Tables don't exist — run migration
         from init_db import upgrade_schema
         upgrade_schema(db)
-        # Also try to create FTS for code_symbols
-        try:
-            db.executescript("""
-                CREATE VIRTUAL TABLE IF NOT EXISTS code_symbols_fts USING fts5(
-                    name, qualified_name, signature, docstring,
-                    content=code_symbols, content_rowid=rowid
-                );
-                CREATE TRIGGER IF NOT EXISTS code_symbols_ai AFTER INSERT ON code_symbols BEGIN
-                    INSERT INTO code_symbols_fts(rowid, name, qualified_name, signature, docstring)
-                    VALUES (new.rowid, new.name, new.qualified_name, new.signature, new.docstring);
-                END;
-                CREATE TRIGGER IF NOT EXISTS code_symbols_ad AFTER DELETE ON code_symbols BEGIN
-                    INSERT INTO code_symbols_fts(code_symbols_fts, rowid, name, qualified_name, signature, docstring)
-                    VALUES ('delete', old.rowid, old.name, old.qualified_name, old.signature, old.docstring);
-                END;
-                CREATE TRIGGER IF NOT EXISTS code_symbols_au AFTER UPDATE ON code_symbols BEGIN
-                    INSERT INTO code_symbols_fts(code_symbols_fts, rowid, name, qualified_name, signature, docstring)
-                    VALUES ('delete', old.rowid, old.name, old.qualified_name, old.signature, old.docstring);
-                    INSERT INTO code_symbols_fts(rowid, name, qualified_name, signature, docstring)
-                    VALUES (new.rowid, new.name, new.qualified_name, new.signature, new.docstring);
-                END;
+
+    # Ensure FTS table exists (separate check — migration path doesn't create it)
+    _ensure_fts(db)
+
+
+def _ensure_fts(db: sqlite3.Connection) -> None:
+    """Ensure code_symbols_fts exists and is populated. Safe to call repeatedly."""
+    try:
+        db.execute("SELECT 1 FROM code_symbols_fts LIMIT 1")
+        return  # Already exists
+    except sqlite3.OperationalError:
+        pass  # Doesn't exist — create it
+
+    try:
+        db.executescript("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS code_symbols_fts USING fts5(
+                name, qualified_name, signature, docstring,
+                content=code_symbols, content_rowid=rowid
+            );
+            CREATE TRIGGER IF NOT EXISTS code_symbols_ai AFTER INSERT ON code_symbols BEGIN
+                INSERT INTO code_symbols_fts(rowid, name, qualified_name, signature, docstring)
+                VALUES (new.rowid, new.name, new.qualified_name, new.signature, new.docstring);
+            END;
+            CREATE TRIGGER IF NOT EXISTS code_symbols_ad AFTER DELETE ON code_symbols BEGIN
+                INSERT INTO code_symbols_fts(code_symbols_fts, rowid, name, qualified_name, signature, docstring)
+                VALUES ('delete', old.rowid, old.name, old.qualified_name, old.signature, old.docstring);
+            END;
+            CREATE TRIGGER IF NOT EXISTS code_symbols_au AFTER UPDATE ON code_symbols BEGIN
+                INSERT INTO code_symbols_fts(code_symbols_fts, rowid, name, qualified_name, signature, docstring)
+                VALUES ('delete', old.rowid, old.name, old.qualified_name, old.signature, old.docstring);
+                INSERT INTO code_symbols_fts(rowid, name, qualified_name, signature, docstring)
+                VALUES (new.rowid, new.name, new.qualified_name, new.signature, new.docstring);
+            END;
+        """)
+        # Backfill existing symbols into FTS
+        count = db.execute("SELECT COUNT(*) FROM code_symbols").fetchone()[0]
+        if count > 0:
+            db.execute("""
+                INSERT INTO code_symbols_fts(rowid, name, qualified_name, signature, docstring)
+                SELECT rowid, name, qualified_name, COALESCE(signature, ''), COALESCE(docstring, '')
+                FROM code_symbols
             """)
             db.commit()
-        except Exception:
-            pass  # FTS creation is optional
+            _log.info("Backfilled %d symbols into code_symbols_fts", count)
+    except Exception as e:
+        _log.warning("FTS creation failed (non-critical): %s", e)

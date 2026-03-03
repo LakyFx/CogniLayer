@@ -110,7 +110,7 @@ def reindex_project(db, project: str, project_path: Path,
         new_rowids = []
         chunk_texts = []
         for chunk in chunks:
-            db.execute("""
+            cursor = db.execute("""
                 INSERT INTO file_chunks (project, file_path, file_mtime,
                                         section_title, chunk_index, content)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -118,7 +118,7 @@ def reindex_project(db, project: str, project_path: Path,
                 project, rel_path, current_mtime,
                 chunk["section_title"], chunk["chunk_index"], chunk["content"]
             ))
-            rowid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+            rowid = cursor.lastrowid
             new_rowids.append(rowid)
             text = chunk["content"]
             if chunk["section_title"]:

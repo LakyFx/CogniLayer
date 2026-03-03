@@ -47,7 +47,8 @@ _EN: dict[str, str] = {
 
     "tool.memory_write.desc": (
         "Save important information to CogniLayer memory. "
-        "Use PROACTIVELY — save as you learn, not just during /harvest."
+        "Use PROACTIVELY — save as you learn, not just during /harvest. "
+        "Updates are versioned — previous content is saved to facts_history."
     ),
     "tool.memory_write.param.content": "What to remember. Must be self-contained.",
     "tool.memory_write.param.type": (
@@ -58,7 +59,7 @@ _EN: dict[str, str] = {
     "tool.memory_write.param.domain": "Domain: auth, ui, deploy, seo...",
     "tool.memory_write.param.source_file": "Relative path to the file where the fact was observed.",
 
-    "tool.memory_delete.desc": "Delete facts from CogniLayer memory by ID.",
+    "tool.memory_delete.desc": "Delete facts from CogniLayer memory by ID. Previous content is saved to facts_history for undo.",
     "tool.memory_delete.param.ids": "UUIDs of facts to delete.",
 
     "tool.file_search.desc": (
@@ -499,6 +500,7 @@ _EN: dict[str, str] = {
         "- References resolved: {resolved}"
     ),
     "code.index_errors": "Errors ({count}):",
+    "code.index_db_totals": "- **Total in index**: {symbols} symbols, {references} references",
 
     # code_search results
     "code.search_header": "## Found {count} symbols for '{query}'",
@@ -544,7 +546,8 @@ _CS: dict[str, str] = {
 
     "tool.memory_write.desc": (
         "Uloz dulezitou informaci do CogniLayer pameti. "
-        "Pouzivej PROAKTIVNE — ukladej jak se ucis, ne jen pri /harvest."
+        "Pouzivej PROAKTIVNE — ukladej jak se ucis, ne jen pri /harvest. "
+        "Aktualizace jsou verzovane — predchozi obsah se uklada do facts_history."
     ),
     "tool.memory_write.param.content": "Co si zapamatovat. Musi byt self-contained.",
     "tool.memory_write.param.type": (
@@ -555,7 +558,7 @@ _CS: dict[str, str] = {
     "tool.memory_write.param.domain": "Oblast: auth, ui, deploy, seo...",
     "tool.memory_write.param.source_file": "Relativni cesta k souboru kde byl fakt pozorovan.",
 
-    "tool.memory_delete.desc": "Smaz fakty z CogniLayer pameti podle ID.",
+    "tool.memory_delete.desc": "Smaz fakty z CogniLayer pameti podle ID. Predchozi obsah se uklada do facts_history pro undo.",
     "tool.memory_delete.param.ids": "UUID faktu ke smazani.",
 
     "tool.file_search.desc": (
@@ -995,6 +998,7 @@ _CS: dict[str, str] = {
         "- Vyresenych referenci: {resolved}"
     ),
     "code.index_errors": "Chyby ({count}):",
+    "code.index_db_totals": "- **Celkem v indexu**: {symbols} symbolu, {references} referenci",
 
     "code.search_header": "## Nalezeno {count} symbolu pro '{query}'",
     "code.search_no_results": "Zadne symboly nalezeny pro '{query}'.",

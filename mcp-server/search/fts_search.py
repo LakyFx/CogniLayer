@@ -1,11 +1,22 @@
 """Search helpers for CogniLayer — FTS5 + vector hybrid search (Phase 2)."""
 
+import concurrent.futures
+import logging
 import sqlite3
 
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from db import ensure_vec
+
+_log = logging.getLogger("cognilayer.search.fts_search")
+
+# Singleton executor for embed_text calls (timeout protection, reused across searches).
+# NOTE: On timeout, the embed task keeps running in the worker thread — Python's
+# concurrent.futures cannot cancel running tasks. If embedding consistently exceeds
+# the 10s timeout, tasks queue up. In practice this never happens (embedding takes <2s)
+# and MCP requests are serial, so at most 1 task is queued.
+_embed_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
 
 # --- Helpers ---
@@ -266,16 +277,13 @@ def fts_search_facts(db: sqlite3.Connection, query: str, project: str = None,
         _tr("START hybrid/vector search (vec_ready=True)")
         try:
             from embedder import embed_text
-            import concurrent.futures
-            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-            future = executor.submit(embed_text, query)
+            future = _embed_executor.submit(embed_text, query)
             try:
                 query_embedding = future.result(timeout=10)
             except concurrent.futures.TimeoutError:
-                executor.shutdown(wait=False, cancel_futures=True)
+                _log.warning("embed_text timeout (10s) for query '%s' — falling back to FTS5 only", query[:50])
                 _tr("embed_text TIMEOUT (10s), falling back to FTS5 only")
                 return fts_results[:limit]
-            executor.shutdown(wait=False)
             _tr("embed_text done")
             vec_distances = _vec_search_facts(db, query_embedding, project, fact_type, scope, limit)
             if vec_distances:
@@ -368,15 +376,12 @@ def fts_search_chunks(db: sqlite3.Connection, query: str, project: str = None,
     if vec_ready:
         try:
             from embedder import embed_text
-            import concurrent.futures
-            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-            future = executor.submit(embed_text, query)
+            future = _embed_executor.submit(embed_text, query)
             try:
                 query_embedding = future.result(timeout=10)
             except concurrent.futures.TimeoutError:
-                executor.shutdown(wait=False, cancel_futures=True)
+                _log.warning("embed_text timeout (10s) for chunk query '%s' — falling back to FTS5 only", query[:50])
                 return fts_results[:limit]
-            executor.shutdown(wait=False)
             vec_distances = _vec_search_chunks(db, query_embedding, project, file_filter, limit)
             if vec_distances:
                 fts_rowids = {r["rowid"] for r in fts_results}

@@ -37,8 +37,6 @@ def _heat_label(score: float) -> str:
     return "cold"
 
 
-_last_decay_times = {}  # per-project throttle: {project_name: datetime}
-
 # Type-based half-lives in days — longer = decays slower
 DECAY_HALF_LIVES = {
     "decision":     180,  # 6 months — decisions are long-lived
@@ -63,13 +61,44 @@ def _apply_heat_decay(db, project: str):
 
     Formula: heat = max(0.05, 0.5 ^ (age_days / half_life_days))
     Each fact type has a different half-life — decisions persist longer, tasks fade faster.
-    Throttled to run at most once per hour.
+    Throttled to run at most once per hour, coordinated across all CLI instances via DB.
     """
     now = datetime.now()
-    last = _last_decay_times.get(project)
-    if last and (now - last).total_seconds() < 3600:
-        return
-    _last_decay_times[project] = now
+
+    # Cross-instance coordination: check last decay time from DB (not module-level dict)
+    try:
+        row = db.execute(
+            "SELECT last_session FROM projects WHERE name = ?", (project,)
+        ).fetchone()
+        if row and row[0]:
+            # Reuse last_session as approximate "last activity" — we store decay time
+            # in a dedicated column if it exists, otherwise use the projects table
+            last_decay_row = None
+            try:
+                last_decay_row = db.execute(
+                    "SELECT last_decay FROM projects WHERE name = ?", (project,)
+                ).fetchone()
+            except Exception:
+                pass  # Column may not exist yet
+
+            if last_decay_row and last_decay_row[0]:
+                try:
+                    last_dt = datetime.fromisoformat(last_decay_row[0])
+                    if last_dt.tzinfo:
+                        last_dt = last_dt.replace(tzinfo=None)
+                    if (now - last_dt).total_seconds() < 3600:
+                        return  # Another instance already ran decay recently
+                except (ValueError, TypeError):
+                    pass
+    except Exception:
+        pass
+
+    # Mark decay as running (best-effort — OK if column doesn't exist)
+    try:
+        db.execute("UPDATE projects SET last_decay = ? WHERE name = ?",
+                   (now.isoformat(), project))
+    except Exception:
+        pass  # last_decay column may not exist yet
 
     rows = db.execute("""
         SELECT id, type, heat_score, last_accessed, timestamp
@@ -150,7 +179,6 @@ def _log_knowledge_gap(db, query: str, project: str, search_type: str, results: 
             UPDATE knowledge_gaps SET resolved = 1
             WHERE project = ? AND query = ? AND resolved = 0
         """, (project, normalized))
-    db.commit()
 
 
 def _get_linked_facts(db, results: list) -> dict:
@@ -301,8 +329,13 @@ def memory_search(query: str, scope: str = "project",
         _trace("START knowledge_gap")
         try:
             _log_knowledge_gap(db, query, project, type, results)
+            db.commit()
         except sqlite3.OperationalError:
             _trace("knowledge_gap SKIPPED (table missing or locked)")
+            try:
+                db.rollback()
+            except Exception:
+                pass
         _trace("knowledge_gap DONE")
 
         # Fetch linked facts and causal chains for display (read-only)

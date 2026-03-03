@@ -40,10 +40,11 @@ def session_init(project_path: str | None = None) -> str:
     """Initialize a CogniLayer session and return full context."""
     logger.info("session_init called with project_path=%s", project_path)
     from on_session_start import (
-        detect_project, register_project_if_new, check_crash_recovery,
-        auto_detect_identity, get_or_generate_dna, get_latest_bridge,
+        detect_project, register_project_if_new,
+        get_or_generate_dna, get_latest_bridge,
         create_session, write_session_file, open_db
     )
+    from tools.project_context import _check_crash_recovery, _auto_detect_identity
 
     if not DB_PATH.exists():
         logger.warning("DB not found at %s", DB_PATH)
@@ -66,8 +67,8 @@ def session_init(project_path: str | None = None) -> str:
     db = open_db()
     try:
         register_project_if_new(db, project_name, path)
-        crash_info = check_crash_recovery(db, project_name)
-        auto_detect_identity(db, project_name, path)
+        crash_info = _check_crash_recovery(db, project_name)
+        _auto_detect_identity(db, project_name, path)
         dna = get_or_generate_dna(db, project_name, path)
         bridge = get_latest_bridge(db, project_name)
         session_id = create_session(db, project_name, claude_session_id)

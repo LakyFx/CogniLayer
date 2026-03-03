@@ -162,9 +162,10 @@ def main():
     """Generate AGENTS.md with CogniLayer block for a project."""
     import sqlite3
     from on_session_start import (
-        detect_project, register_project_if_new, check_crash_recovery,
+        detect_project, register_project_if_new,
         get_or_generate_dna, get_latest_bridge, open_db
     )
+    from tools.project_context import _check_crash_recovery
 
     project_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd()
     project_path = project_path.resolve()
@@ -177,7 +178,7 @@ def main():
     db = open_db()
     try:
         register_project_if_new(db, project_name, project_path)
-        crash_info = check_crash_recovery(db, project_name)
+        crash_info = _check_crash_recovery(db, project_name)
         dna = get_or_generate_dna(db, project_name, project_path)
         bridge = get_latest_bridge(db, project_name)
         db.commit()
