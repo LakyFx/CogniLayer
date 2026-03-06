@@ -30,6 +30,7 @@ from tools.memory_search import memory_search
 from tools.memory_write import memory_write
 from tools.memory_delete import memory_delete
 from tools.file_search import file_search
+from tools.file_index import file_index
 from tools.project_context import project_context
 from tools.session_bridge import session_bridge
 from tools.decision_log import decision_log
@@ -155,6 +156,29 @@ async def list_tools() -> list[Tool]:
                     }
                 },
                 "required": ["query"]
+            }
+        ),
+        Tool(
+            name="file_index",
+            description=t("tool.file_index.desc"),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_path": {
+                        "type": "string",
+                        "description": t("tool.file_index.param.project_path")
+                    },
+                    "full": {
+                        "type": "boolean",
+                        "description": t("tool.file_index.param.full"),
+                        "default": False
+                    },
+                    "time_budget": {
+                        "type": "number",
+                        "description": t("tool.file_index.param.time_budget"),
+                        "default": 30.0
+                    }
+                }
             }
         ),
         Tool(
@@ -438,6 +462,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 file_filter=arguments.get("file_filter"),
                 limit=arguments.get("limit", 5)
             )
+        elif name == "file_index":
+            result = file_index(
+                project_path=arguments.get("project_path"),
+                full=arguments.get("full", False),
+                time_budget=arguments.get("time_budget", 30.0)
+            )
         elif name == "project_context":
             result = project_context()
         elif name == "session_bridge":
@@ -591,10 +621,10 @@ def test_tools():
 if __name__ == "__main__":
     if "--test" in sys.argv:
         count = test_tools()
-        if count == 17:
+        if count == 18:
             print(f"\nOK: All {count} tools registered.")
         else:
-            print(f"\nERROR: Expected 17 tools, got {count}.")
+            print(f"\nERROR: Expected 18 tools, got {count}.")
             sys.exit(1)
     else:
         import asyncio

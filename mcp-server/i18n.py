@@ -154,7 +154,7 @@ _EN: dict[str, str] = {
     # file_search.py
     # ======================================================================
     "file_search.no_results": "No results found for '{query}'.",
-    "file_search.not_indexed": "No results found for '{query}'.\nNote: No documents indexed for this project yet. Run /onboard to index project docs (PRD, README, configs).",
+    "file_search.not_indexed": "No results found for '{query}'.\nNote: No documents indexed for this project yet. Run file_index() to index project docs (PRD, README, configs).",
     "file_search.header": "## Found {count} chunks for '{query}'\n",
     "file_search.no_title": "(no heading)",
     "file_search.section_label": "section",
@@ -458,6 +458,29 @@ _EN: dict[str, str] = {
     ),
 
     # ======================================================================
+    # File indexing (file_index)
+    # ======================================================================
+    "tool.file_index.desc": (
+        "Index project documentation files (README, configs, PRD, YAML, JSON, TOML) "
+        "into file_chunks so that file_search() returns results. "
+        "Run once per project. Incremental — only re-indexes changed files."
+    ),
+    "tool.file_index.param.project_path": "Override project path. Default: detected from session.",
+    "tool.file_index.param.full": "Force full re-index (clear all chunks first). Default: false (incremental).",
+    "tool.file_index.param.time_budget": "Max seconds for indexing (default 30). Partial results returned on timeout.",
+    "file_index.no_path": "Cannot determine project path. Provide project_path or run session_init first.",
+    "file_index.invalid_path": "Invalid project path: {path}",
+    "file_index.error": "File indexing failed: {error}",
+    "file_index.success": (
+        "File indexing complete for '{project}'.\n"
+        "  Files indexed this run: {indexed}\n"
+        "  Total indexed files: {total_files}\n"
+        "  Total chunks: {total_chunks}\n"
+        "  Indexable files found: {available}\n"
+        "file_search() is now ready."
+    ),
+
+    # ======================================================================
     # Code Intelligence tools (code_index, code_search, code_context, code_impact)
     # ======================================================================
     "tool.code_index.desc": (
@@ -673,7 +696,7 @@ _CS: dict[str, str] = {
     # file_search.py
     # ======================================================================
     "file_search.no_results": "Zadne vysledky pro '{query}'.",
-    "file_search.not_indexed": "Zadne vysledky pro '{query}'.\nPoznamka: Pro tento projekt nebyly zaindexovany zadne dokumenty. Spust /onboard pro indexaci docs (PRD, README, konfigurace).",
+    "file_search.not_indexed": "Zadne vysledky pro '{query}'.\nPoznamka: Pro tento projekt nebyly zaindexovany zadne dokumenty. Spust file_index() pro indexaci docs (PRD, README, konfigurace).",
     "file_search.header": "## Nalezeno {count} chunku pro '{query}'\n",
     "file_search.no_title": "(bez nadpisu)",
     "file_search.section_label": "sekce",
@@ -974,6 +997,29 @@ _CS: dict[str, str] = {
         "- Pouzivej memory_write proaktivne pro ukladani poznatku\n"
         "- Na konci session: session_bridge(action=\"save\", content=\"Progress: ...; Open: ...\")\n"
         "- Pred deployem/pushem: verify_identity(action_type=\"...\")"
+    ),
+
+    # ======================================================================
+    # File indexing (file_index)
+    # ======================================================================
+    "tool.file_index.desc": (
+        "Zaindexuj dokumentacni soubory projektu (README, konfigurace, PRD, YAML, JSON, TOML) "
+        "do file_chunks, aby file_search() vracel vysledky. "
+        "Spust jednou na projekt. Inkrementalni — reindexuje jen zmenene soubory."
+    ),
+    "tool.file_index.param.project_path": "Prepis cestu projektu. Vychozi: detekovana ze session.",
+    "tool.file_index.param.full": "Vynutit plnou reindexaci (smazat vsechny chunky). Vychozi: false (inkrementalni).",
+    "tool.file_index.param.time_budget": "Max sekund pro indexaci (vychozi 30). Pri timeoutu se vrati castecny vysledek.",
+    "file_index.no_path": "Nelze urcit cestu projektu. Zadej project_path nebo nejdriv spust session_init.",
+    "file_index.invalid_path": "Neplatna cesta projektu: {path}",
+    "file_index.error": "Indexace souboru selhala: {error}",
+    "file_index.success": (
+        "Indexace souboru dokoncena pro '{project}'.\n"
+        "  Souboru zaindexovano v tomto behu: {indexed}\n"
+        "  Celkem zaindexovanych souboru: {total_files}\n"
+        "  Celkem chunku: {total_chunks}\n"
+        "  Indexovatelnych souboru nalezeno: {available}\n"
+        "file_search() je nyni pripraveno."
     ),
 
     # ======================================================================
