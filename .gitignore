@@ -40,6 +40,10 @@ Thumbs.db
 
 # Claude Code
 CLAUDE.md
+AGENTS.md
+
+# Promotional content
+reddit-*.txt
 
 # Local git hook (auto-deploy, dev-only)
 hooks/git-post-commit
