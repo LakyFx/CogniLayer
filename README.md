@@ -181,7 +181,7 @@ Parent (200K context):
 | **Safety Gates** | Identity Card system blocks deploy to wrong server. Audit trail on every safety change |
 | **Agent Interop** | Claude Code and Codex CLI share the same brain. Switch agents mid-task, zero context loss |
 | **Session Bridges** | Every session starts with a summary of what happened last time |
-| **TUI Dashboard** | Visual memory browser with 7 tabs - see everything at a glance |
+| **TUI Dashboard** | Visual memory browser with 8 tabs - see everything at a glance |
 
 ---
 
@@ -274,7 +274,7 @@ Once installed, use these in Claude Code:
 
 ## TUI Dashboard
 
-A visual memory browser right in your terminal. 7 tabs, keyboard navigation, works on Windows, Mac, and Linux.
+A visual memory browser right in your terminal. 8 tabs, keyboard navigation, works on Windows, Mac, and Linux.
 
 ```bash
 cognilayer                    # All projects
@@ -430,10 +430,10 @@ Claude Code / Codex CLI Session
 │   ├── generate_agents_md.py  # Codex AGENTS.md generator
 │   └── register.py            # Claude Code settings.json registration
 ├── tui/                       # TUI Dashboard (Textual)
-│   ├── app.py                 # Main application (7 tabs, keyboard nav)
+│   ├── app.py                 # Main application (8 tabs, keyboard nav)
 │   ├── data.py                # Read-only SQLite data access layer
 │   ├── styles.tcss            # CSS stylesheet
-│   ├── screens/               # 7 tab screen modules
+│   ├── screens/               # 8 tab screen modules
 │   └── widgets/               # Heat cell, stats card widgets
 └── logs/
     └── cognilayer.log
