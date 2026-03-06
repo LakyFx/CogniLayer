@@ -1,7 +1,7 @@
 [project]
 name = "cognilayer"
 version = "4.2.0"
-description = "Persistent memory + code intelligence + subagent protocol for Claude Code & Codex CLI — save 80-200K+ tokens/session. 17 MCP tools, hybrid search, subagent context compression, TUI dashboard, crash recovery."
+description = "Persistent memory + code intelligence + subagent protocol for Claude Code & Codex CLI — save 80-200K+ tokens/session. 18 MCP tools, hybrid search, subagent context compression, TUI dashboard, crash recovery."
 readme = "README.md"
 license = "Elastic-2.0"
 requires-python = ">=3.11"

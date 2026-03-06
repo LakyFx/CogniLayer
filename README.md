@@ -18,7 +18,7 @@ With CogniLayer, it already knows. Three things your agent doesn't have today:
 [![Version](https://img.shields.io/badge/version-4.2.0-orange.svg)](#)
 [![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-green.svg)](https://www.python.org/)
-[![MCP Server](https://img.shields.io/badge/MCP-17%20tools-purple.svg)](https://modelcontextprotocol.io/)
+[![MCP Server](https://img.shields.io/badge/MCP-18%20tools-purple.svg)](https://modelcontextprotocol.io/)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-supported-blueviolet.svg)](#)
 [![Codex CLI](https://img.shields.io/badge/Codex%20CLI-supported-blueviolet.svg)](#)
 
@@ -253,7 +253,7 @@ python diagnose.py --fix    # Check + auto-fix missing dependencies
 
 ---
 
-## Slash Commands
+## Slash Commands (Claude Code only)
 
 Once installed, use these in Claude Code:
 
@@ -269,6 +269,8 @@ Once installed, use these in Claude Code:
 | `/consolidate` | Organize memory - cluster, detect contradictions, assign tiers |
 | `/tui` | Launch the visual dashboard |
 | `/cognihelp` | Show all available commands |
+
+> **Codex CLI users:** Slash commands are not available in Codex. Instead, CogniLayer uses AGENTS.md instructions + MCP tools directly. See [Codex CLI Integration](#codex-cli-integration) below.
 
 ---
 
@@ -358,7 +360,7 @@ search:
 
 - **Concurrent CLIs**: Running Claude Code and Codex CLI simultaneously on the same project may cause session tracking conflicts. Use one CLI at a time per project.
 - **Codex file tracking**: Codex CLI has no hooks, so automatic file change tracking is not available for Codex sessions.
-- **Code intelligence**: Requires `tree-sitter-language-pack` (~20MB). Without it, all other 13 tools work normally.
+- **Code intelligence**: Requires `tree-sitter-language-pack` (~20MB). Without it, all other 14 tools work normally.
 - **TUI**: Requires `textual` package. Read-only except for resolving contradictions.
 
 ---
@@ -422,7 +424,7 @@ Claude Code / Codex CLI Session
 │   ├── indexer/           # File scanning and chunking
 │   ├── search/            # FTS5 + vector hybrid search
 │   ├── code/              # Code Intelligence (tree-sitter parsers, indexer, resolver)
-│   └── tools/             # 17 MCP tool implementations
+│   └── tools/             # 18 MCP tool implementations
 ├── hooks/
 │   ├── on_session_start.py    # Project detection, DNA injection, crash recovery
 │   ├── on_session_end.py      # Session close, emergency bridge, episode building
